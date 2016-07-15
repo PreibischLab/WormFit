@@ -1,13 +1,21 @@
 package klim;
 
 import java.io.File;
-import java.util.Iterator;
+import java.util.concurrent.Executors;
 
-import javax.swing.text.View;
-
+import stephan.MeanFilter;
+import fiji.threshold.Auto_Threshold;
+import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.io.FileSaver;
+import ij.plugin.frame.MemoryMonitor;
+import mpicbg.imglib.image.Image;
+import mpicbg.imglib.wrapper.ImgLib2;
+import mpicbg.stitching.PairWiseStitchingImgLib;
+import mpicbg.stitching.PairWiseStitchingResult;
 import net.imglib2.Cursor;
+import net.imglib2.FinalInterval;
 import net.imglib2.Interval;
 import net.imglib2.IterableInterval;
 import net.imglib2.KDTree;
@@ -16,36 +24,34 @@ import net.imglib2.PointSampleList;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.RealPointSampleList;
 import net.imglib2.algorithm.fft2.FFTConvolution;
 import net.imglib2.algorithm.gauss3.Gauss3;
-import net.imglib2.algorithm.labeling.AllConnectedComponents;
-import net.imglib2.algorithm.labeling.ConnectedComponents;
 import net.imglib2.algorithm.stats.Normalize;
+import net.imglib2.exception.ImgLibException;
 import net.imglib2.exception.IncompatibleTypeException;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
-import net.imglib2.img.array.ArrayImg;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.array.ArrayImgs;
-import net.imglib2.img.cell.CellImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.img.imageplus.FloatImagePlus;
+import net.imglib2.img.imageplus.ImagePlusImgFactory;
+import net.imglib2.multithreading.SimpleMultiThreading;
 import net.imglib2.neighborsearch.NearestNeighborSearchOnKDTree;
 import net.imglib2.roi.labeling.ImgLabeling;
-import net.imglib2.roi.labeling.LabelingType;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.logic.BitType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.complex.ComplexFloatType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.view.RandomAccessiblePair;
 import net.imglib2.view.Views;
 import util.ImgLib2Util;
 
 public class SobelFilter {
 
 	private static final boolean debug = false;
+	private static final boolean showImage = true;
 
 	// this class applies Sobel Filter
 	public static <T extends RealType<T>> void sobelFilter(
@@ -57,6 +63,7 @@ public class SobelFilter {
 			final RandomAccessible< T > infSrc, final Interval srcInterval, final RandomAccessibleInterval< T > dst, final int[] kernelDim){
 
 		final RandomAccessibleInterval<T> src = Views.interval(infSrc, srcInterval);
+		sobelFilter(src, dst, kernelDim); // TODO: check if this one is corrects
 
 	}
 
@@ -105,9 +112,9 @@ public class SobelFilter {
 		} 
 		if (dim == 3){
 			float[] kernel = new float[]{
-					1,2,1, 		2,4,2, 		1,2,1,
-					0,0,0, 		0,0,0,		0,0,0,
-					-1,-2,-1, -2,-4,-2, -1,-2,-1};
+					1, 2, 1, 	2, 4, 2, 	1, 2, 1,
+					0, 0, 0, 	0, 0, 0,	0, 0, 0,
+					-1,-2,-1,  -2,-4,-2,   -1,-2,-1};
 			for (int i = 0; i < kernel.length; ++i) {
 				kernel[i] /= 16;
 			}
@@ -189,7 +196,7 @@ public class SobelFilter {
 	public static < T extends RealType< T >> void  applyGaussianFilter(RandomAccessibleInterval <T> img, RandomAccessibleInterval <T> img2) throws IncompatibleTypeException{
 		double[] sigma = new double[ img.numDimensions() ];
 		for (int d = 0; d < img.numDimensions(); ++d)
-			sigma[d] = 4; // size of the radius
+			sigma[d] = 2; // size of the radius
 		Gauss3.gauss(sigma, Views.extendMirrorSingle(img), img2);
 	}
 
@@ -235,7 +242,7 @@ public class SobelFilter {
 		while (cursor.hasNext()){
 			cursor.fwd();
 			randomAccess.setPosition(cursor);
-			randomAccess.get().setReal(cursor.get().getRealDouble());		
+			randomAccess.get().setReal(cursor.get().getRealFloat());		
 		}
 	}
 
@@ -250,11 +257,24 @@ public class SobelFilter {
 
 	public static <T extends RealType<T>> void applySobelFilter(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> img2, RandomAccessibleInterval<T> kernel, T minValue, T maxValue, RandomAccessibleInterval<T> tmp){
 
+
+		// int[] mapping = new int []{0, 0, 2, 1, 1, 2};
+
 		// apply Sobel filter # of dimensions times
 		for (int d = 0; d < img.numDimensions(); d++) {
+			// if (d == 2) continue;
+
 			copy(Views.iterable(img), tmp);
 			// convolve with each kernel
-			new FFTConvolution<T>(tmp, Views.rotate(kernel, 0, d), new ArrayImgFactory<ComplexFloatType>()).convolve();
+			// DEBUG: This one only works for 2D
+			if (img.numDimensions() == 2)
+				new FFTConvolution<T>(tmp, Views.rotate(kernel, 0, d), new ArrayImgFactory<ComplexFloatType>()).convolve();
+			else{
+				// for 3D you want 0-1 0-2 1-2 
+				int[] mapping = new int []{0, 0, 1, 1, 2, 2};
+				new FFTConvolution<T>(tmp, Views.rotate(kernel, mapping[d], mapping[d + img.numDimensions()]), new ArrayImgFactory<ComplexFloatType>()).convolve();
+				// ImageJFunctions.show(Views.rotate(kernel, mapping[d], mapping[d + img.numDimensions()]));
+			}
 
 			// here we copy data to the destination image
 			Cursor<T> tmpCursor = Views.iterable(tmp).cursor();
@@ -269,7 +289,6 @@ public class SobelFilter {
 				//System.out.println(val);
 				dstRandomAccess.get().add(val);
 			}
-
 		}
 
 		Cursor<T> dstCursor = Views.iterable(img2).cursor();
@@ -319,7 +338,7 @@ public class SobelFilter {
 			else{
 				rOut.get().setZero();
 			}
-			
+
 			// TODO: check this one: adjust the brightness of the boundary, if necessary
 			if(rIn.get().getInteger() == 1){
 				rOut.get().set(80);
@@ -341,83 +360,209 @@ public class SobelFilter {
 			) throws IncompatibleTypeException{		
 
 		Normalize.normalize(Views.iterable(initialImg), minValue, maxValue);
+		System.out.println("Normalization: done!");
 		final int n = initialImg.numDimensions();
 		// ImageJFunctions.show(initialImg);	
-
-		// applyMedianFilter(initialImg, filterImg);
 		applyGaussianFilter(initialImg, filterImg);	
+		System.out.println("Gaussian filter: done!");
+		// applyMedianFilter(initialImg, filterImg);
+		// System.out.println("Median filter: done!");
+
+
 		Img<T> kernel = (Img<T>) setKernel(n, 0);
 
 		final Img<T> edgeTmpImg = new ArrayImgFactory<T>().create(edgeImg, minValue);
 
 		applySobelFilter(filterImg, edgeTmpImg, kernel, minValue, maxValue, new ArrayImgFactory<T>());
-		if (debug)
+		System.out.println("Sobel filter: done!");
+		if (debug){
 			ImageJFunctions.show(filterImg).setTitle("DEBUG: filterImg: in function");	
-		
+			ImageJFunctions.show(edgeTmpImg).setTitle("DEBUG: edgeTmpImg: in function");
+
+		}
+
+
 		Thresholding.threshold(edgeTmpImg, thresholdImg, tVal);
-		
+		System.out.println("Thresholding: done!");
+
 		if (debug)
 			ImageJFunctions.show(thresholdImg).setTitle("DEBUG: thresholdImg: in function");
+
+		// if (true) return;
+
 		copyBitToFloat(Views.iterable(thresholdImg), edgeTmpImg);
 		Normalize.normalize(Views.iterable(edgeTmpImg), minValue, maxValue);
-		if (debug)
-			ImageJFunctions.show(edgeTmpImg).setTitle("DEBUG: edgeImg: in function");
+		System.out.println("Normalization: done!");
+		//if (debug)
+		// 	ImageJFunctions.show(edgeTmpImg).setTitle("DEBUG: edgeImg: in function");
+
+
 
 		kernel = (Img<T>) setKernel(n, 1);
 		applySobelFilter(edgeTmpImg, edgeImg, kernel, minValue, maxValue, new ArrayImgFactory<T>());
-		// ImageJFunctions.show(edgeImg).setTitle("edgeImg: in function");
+		System.out.println("Sobel filter: done!");
+		ImageJFunctions.show(edgeImg).setTitle("edgeImg: in function");
+
+		if (false) return;
 
 
 		final ImgLabeling<Integer, IntType> labeling = new ImgLabeling<Integer, IntType>(new ArrayImgFactory<IntType>().create(thresholdImg, new IntType())); 
 		BoundingBox.setLabeling(thresholdImg, labeling);
+		System.out.println("Labeling: done!");
 		if (debug)
 			ImageJFunctions.show(labeling.getIndexImg()).setTitle("DEBUG: labeling: in function");
 
 		PointSampleList<T> worm = new PointSampleList<T>(initialImg.numDimensions());
 		BoundingBox.setPointSampleList(labeling, (RandomAccessible<T>)initialImg, worm);
 		Thresholding.threshold(edgeImg, thresholdImg, tVal);
-		
+		System.out.println("Thresholding: done!");
+
 		if (debug)
 			ImageJFunctions.show(thresholdImg).setTitle("DEBUG: thresholdImg: in function");
 
 		// PointSampleList<BitType> wormOutline = new PointSampleList<BitType>(initialImg.numDimensions());
 		distanceTransformKDTree(worm, thresholdImg, (RandomAccessibleInterval<FloatType>)distanceImg, wormOutline);
+		System.out.println("Distance transform: done!");
 		Normalize.normalize(distanceImg, minValue, maxValue);
+		System.out.println("Normalization: done!");
 		if (debug)
 			ImageJFunctions.show(distanceImg).setTitle("DEBUG: distanceImg: in function");	
 	}
 
 
+	public static <T extends RealType<T>> void subtractImg(RandomAccessibleInterval<T> first, RandomAccessibleInterval<T> second){
+		Cursor<T> f = Views.iterable(first).cursor();
+		RandomAccess<T> s = second.randomAccess();
+
+		while(f.hasNext()){
+			f.fwd();
+			s.setPosition(f);
+			f.get().sub(s.get());
+		}
+
+	}
+
 	public static <T extends RealType<T>>void main(String[] args) throws IncompatibleTypeException{
 		new ImageJ();
-		File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one-1.tif");
-		// File file = new File("../Documents/Useful/initial_worms_pics/1001-red-one-1.tif");
-		// File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one.tif");
 
-		Img<FloatType> initialImg = ImgLib2Util.openAs32Bit(file);	
-		ImgFactory< FloatType > imgFactory = new ArrayImgFactory< FloatType >();
-		ImgFactory< BitType > bitFactory = new ArrayImgFactory< BitType >();
+		// to have memory monitor
+		Executors.newFixedThreadPool( 1 ).execute(new Runnable()
+		{
+			@Override
+			public void run() {new MemoryMonitor();}
+		});
 
-		Img< FloatType > filterImg = imgFactory.create( initialImg, new FloatType() );
-		Img< BitType > thresholdImg = bitFactory.create( initialImg, new BitType() );
-		Img< FloatType > edgeImg = imgFactory.create( initialImg, new FloatType() );
-		Img< FloatType > distanceImg = imgFactory.create( initialImg, new FloatType() );
 
-		PointSampleList<BitType> wormOutline = new PointSampleList<BitType>(initialImg.numDimensions());
-		processWorm(initialImg, filterImg, edgeImg, thresholdImg, distanceImg,
-				new FloatType((float) 0), new FloatType((float) 255), new FloatType((float) 52),
-				new BitType(false), new BitType(true), wormOutline);
+		System.out.println("Max memory: " + java.lang.Runtime.getRuntime().maxMemory());
 
-		ImageJFunctions.show(initialImg).setTitle("initialImg");
-		ImageJFunctions.show(filterImg).setTitle("filterImg");
-		ImageJFunctions.show(edgeImg).setTitle("edgeImg");
-		ImageJFunctions.show(thresholdImg).setTitle("thresholdImg");
-		ImageJFunctions.show(distanceImg).setTitle("distanceImg");
+		for (int num = 0; num < 1; ++num){
 
-		
-		// wormOutline.
-		
-		
-		System.out.println("DONE!");
+			// File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one-1.tif");
+			// File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one-1.tif");
+			File file = new File("../Documents/Useful/initial_worms_pics/stack/1001-yellow-one0" + num +".tif");
+
+			//Auto_Threshold.
+			//IJ.run(new ImagePlus(file.getAbsolutePath()), "Auto Threshold", "method=Default ignore_white white stack");
+			//ImageJFunctions.convertFloat(imp)
+			// File file = new File("../Documents/Useful/initial_worms_pics/1003_first_3D.tif");
+			// File file = new File("../Documents/Useful/initial_worms_pics/1001-red-one-1.tif");
+			// File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one.tif");
+
+			//ImagePlusImgFactory<FloatType> >> directly compatible with ImagePlus
+			Img<FloatType> initialImg = ImgLib2Util.openAs32Bit(file);		
+			Img<FloatType> im2 = initialImg.copy();
+			
+			// wrap them to ImgLib1 for old phase correlation code
+			Image<mpicbg.imglib.type.numeric.real.FloatType> i1 = ImgLib2.wrapFloatToImgLib1( initialImg );
+			Image<mpicbg.imglib.type.numeric.real.FloatType> i2 = ImgLib2.wrapFloatToImgLib1( im2 );
+			PairWiseStitchingResult r = PairWiseStitchingImgLib.computePhaseCorrelation(i1, i2, 5, false);
+			System.out.println( r.getCrossCorrelation() );
+			for ( int d = 0; d < initialImg.numDimensions(); ++ d )
+				System.out.println( r.getOffset( d )  );
+			
+			SimpleMultiThreading.threadHaltUnClean();
+			
+			ImgFactory< FloatType > imgFactory = new ArrayImgFactory< FloatType >();
+			ImgFactory< BitType > bitFactory = new ArrayImgFactory< BitType >();
+
+			ImagePlus i = ImageJFunctions.wrapFloat(initialImg, "bdfs");
+			FileSaver saver = new FileSaver(i);
+			saver.saveAsTiffStack("out.tiff" ); //3d
+			saver.saveAsTiff("out.tiff" ); //2d
+						
+			// lets have a look if this preprocessing works! 
+			Img < FloatType > preprocessedImg = imgFactory.create( initialImg, new FloatType());
+
+			// MedianFilter.medianFilter(initialImg, preprocessedImg, new int []{51, 51});
+
+			final int n = initialImg.numDimensions();
+			final long[] min = new long[ n ];
+			final long[] max = new long[ n ];
+
+			for ( int d = 0; d < n; ++d )
+			{
+				min[ d ] = -25;
+				max[ d ] = 25;
+			}
+
+			System.out.println("before mean!");
+			stephan.MeanFilter.filterRect(initialImg, preprocessedImg, new FinalInterval(min, max));
+			System.out.println("mean done!");
+			// subtractImg(initialImg, preprocessedImg);
+
+			subtractImg(preprocessedImg, initialImg);
+			
+			Img< FloatType > filterImg = imgFactory.create( initialImg, new FloatType() );
+			Img< BitType > thresholdImg = bitFactory.create( initialImg, new BitType() );
+			Img< FloatType > edgeImg = imgFactory.create( initialImg, new FloatType() );
+			Img< FloatType > distanceImg = imgFactory.create( initialImg, new FloatType() );
+
+
+			// applyGaussianFilter(initialImg, filterImg);	
+			// System.out.println("Gaussian filter: done!");
+
+
+			PointSampleList<BitType> wormOutline = new PointSampleList<BitType>(initialImg.numDimensions());
+			processWorm(preprocessedImg, filterImg, edgeImg, thresholdImg, distanceImg,
+					new FloatType((float) 0), new FloatType((float) 255), new FloatType((float) 110.0), // 52
+					new BitType(false), new BitType(true), wormOutline);
+
+			if (showImage){
+				ImageJFunctions.show(initialImg).setTitle("initialImg");
+				ImageJFunctions.show(filterImg).setTitle("filterImg");
+				ImageJFunctions.show(edgeImg).setTitle("edgeImg");
+				ImageJFunctions.show(thresholdImg).setTitle("thresholdImg");
+				ImageJFunctions.show(distanceImg).setTitle("distanceImg");
+			}
+
+			// ImageJFunctions.show(distanceImg).setTitle("distanceImg " + num);
+
+			// debugging + sandbox 
+
+			//		Img< FloatType > tmpImg = imgFactory.create( initialImg, new FloatType() );
+			//		Cursor<BitType> wormOulineCursor = wormOutline.cursor(); 
+			//		RandomAccess<FloatType> ra = tmpImg.randomAccess();
+			//		long idx = 0;
+			//		while(wormOulineCursor.hasNext()){
+			//			wormOulineCursor.fwd();
+			//			ra.setPosition(wormOulineCursor);
+			//			ra.get().set(idx++);
+			//
+			//			for (int d = 0; d < wormOutline.numDimensions(); ++d){
+			//				System.out.print(wormOulineCursor.getIntPosition(d) + " ");
+			//			}
+			//			System.out.println();
+			//
+			//		}
+			//		ImageJFunctions.show(tmpImg).setTitle("tmpImg");
+			//		// wormOutline.
+			//		PointSampleList<FloatType> endPoints = new PointSampleList<FloatType>(initialImg.numDimensions());
+			//
+			//		CentralCurveDetection.detectEnds(endPoints, wormOutline, initialImg, new FloatType(255));
+
+			
+			
+			System.out.println("DONE!");
+		}
 	}
 }

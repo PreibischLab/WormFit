@@ -26,22 +26,22 @@ import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
 
 public class BoundingBox {
-	
+
 	// returns labeling for each connected component 
 	public static void setLabeling(RandomAccessibleInterval<BitType> bitImg, ImgLabeling<Integer, IntType> labeling) {
 		final Iterator<Integer> labelIterator = AllConnectedComponents.getIntegerNames(0);
 		ConnectedComponents.labelAllConnectedComponents(bitImg, labeling, labelIterator, ConnectedComponents.StructuringElement.EIGHT_CONNECTED );		
 	}
-	
+
 	// divide the objects in the image into separate chunks
 	// this one will be used further to get rid of 'noisy' objects 
 	public static <T extends RealType<T>> void setPointSampleList(final ImgLabeling<Integer, IntType> labeling, final RandomAccessible<T> img, PointSampleList<T> worm){
 		// this one bellow is the final list you'll need 
 		ArrayList<PointSampleList<T>> objectsList = new ArrayList<>();
-		
+
 		Cursor<IntType> cursor = Views.iterable(labeling.getIndexImg()).cursor();
 		RandomAccess <T> randomAccess = img.randomAccess();
-		
+
 		// number of objects in the picture
 		// calculated dynamically
 		int curMax = 0;
@@ -55,10 +55,14 @@ public class BoundingBox {
 					++curMax; 
 				}
 			}
-			randomAccess.setPosition(cursor);
-			objectsList.get(curElement).add(new Point(randomAccess), randomAccess.get()); // .copy here ?
+			try{
+				randomAccess.setPosition(cursor);
+				objectsList.get(curElement).add(new Point(randomAccess), randomAccess.get()); // .copy here ?
+			}
+			catch(Exception e){
+				System.out.println(objectsList.get(curElement).size());
+			}
 		}
-		
 		// search for worm index 
 		// taking into account that worm is the largest object
 		int idx = 0; 
