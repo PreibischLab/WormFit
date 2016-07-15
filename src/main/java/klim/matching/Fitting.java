@@ -68,7 +68,7 @@ public class Fitting
 			//for ( int d = 0; d < pm.getP1().getW().length; ++ d )
 			//	pm.getP1().getW()[ d ] = w[ d ];
 			
-			System.out.println( "p1(w[]): " + Util.printCoordinates( pm.getP1().getW() ) + " >> p2(l[]): " + Util.printCoordinates( pm.getP2().getL() ) );
+			System.out.println( "p1(w[]): " + Util.printCoordinates( pm.getP1().getW() ) + " >> p2(l[]): " + Util.printCoordinates( pm.getP2().getW() ) + " error: " + pm.getDistance() );
 		}
 	}
 
