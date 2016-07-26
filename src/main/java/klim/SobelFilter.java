@@ -470,25 +470,25 @@ public class SobelFilter {
 
 			//ImagePlusImgFactory<FloatType> >> directly compatible with ImagePlus
 			Img<FloatType> initialImg = ImgLib2Util.openAs32Bit(file);		
-			Img<FloatType> im2 = initialImg.copy();
+			//Img<FloatType> im2 = initialImg.copy();
 			
 			// wrap them to ImgLib1 for old phase correlation code
-			Image<mpicbg.imglib.type.numeric.real.FloatType> i1 = ImgLib2.wrapFloatToImgLib1( initialImg );
-			Image<mpicbg.imglib.type.numeric.real.FloatType> i2 = ImgLib2.wrapFloatToImgLib1( im2 );
-			PairWiseStitchingResult r = PairWiseStitchingImgLib.computePhaseCorrelation(i1, i2, 5, false);
-			System.out.println( r.getCrossCorrelation() );
-			for ( int d = 0; d < initialImg.numDimensions(); ++ d )
-				System.out.println( r.getOffset( d )  );
-			
-			SimpleMultiThreading.threadHaltUnClean();
+//			Image<mpicbg.imglib.type.numeric.real.FloatType> i1 = ImgLib2.wrapFloatToImgLib1( initialImg );
+//			Image<mpicbg.imglib.type.numeric.real.FloatType> i2 = ImgLib2.wrapFloatToImgLib1( im2 );
+//			PairWiseStitchingResult r = PairWiseStitchingImgLib.computePhaseCorrelation(i1, i2, 5, false);
+//			System.out.println( r.getCrossCorrelation() );
+//			for ( int d = 0; d < initialImg.numDimensions(); ++ d )
+//				System.out.println( r.getOffset( d )  );
+//			
+//			SimpleMultiThreading.threadHaltUnClean();
 			
 			ImgFactory< FloatType > imgFactory = new ArrayImgFactory< FloatType >();
 			ImgFactory< BitType > bitFactory = new ArrayImgFactory< BitType >();
 
-			ImagePlus i = ImageJFunctions.wrapFloat(initialImg, "bdfs");
-			FileSaver saver = new FileSaver(i);
-			saver.saveAsTiffStack("out.tiff" ); //3d
-			saver.saveAsTiff("out.tiff" ); //2d
+//			ImagePlus i = ImageJFunctions.wrapFloat(initialImg, "bdfs");
+//			FileSaver saver = new FileSaver(i);
+//			saver.saveAsTiffStack("out.tiff" ); //3d
+//			saver.saveAsTiff("out.tiff" ); //2d
 						
 			// lets have a look if this preprocessing works! 
 			Img < FloatType > preprocessedImg = imgFactory.create( initialImg, new FloatType());

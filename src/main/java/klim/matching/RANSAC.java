@@ -7,6 +7,7 @@ import java.util.List;
 import mpicbg.models.NotEnoughDataPointsException;
 import mpicbg.models.Point;
 import mpicbg.models.PointMatch;
+import mpicbg.models.RigidModel2D;
 import mpicbg.models.TranslationModel2D;
 import net.imglib2.util.Util;
 
@@ -15,6 +16,9 @@ public class RANSAC
 
 	public static void fitPointCloudsTranslationOutlierRemoval()
 	{
+		RigidModel2D m2 = new RigidModel2D();
+		m2.set( Math.toRadians( 45), 400, 120 );
+		
 		// l[] - local coordinates
 		Point p1a = new Point( new double[]{ 0.0, 0.0 } );
 		Point p2a = new Point( new double[]{ 100.0, 0.0 } );
@@ -44,6 +48,7 @@ public class RANSAC
 		
 		// maps the w[] - world coordinates of p1 to l[] of p2
 		TranslationModel2D m = new TranslationModel2D();
+		//RigidModel2D m;
 		
 		System.out.println( m.getClass().getSimpleName() + " needs " + m.getMinNumMatches() + " matches, we have: " + candidates.size() );
 
@@ -53,7 +58,7 @@ public class RANSAC
 		try
 		{
 			// now it finds the transformation mapping p1(w[]) >> p2(l[])
-			m.ransac(candidates, inliers, 10000, 5.0, 0.7 );
+			m.ransac(candidates, inliers, 10000, 0.01, 0.7 );
 
 			if ( inliers.size() == 0 )
 			{

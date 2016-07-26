@@ -18,12 +18,14 @@ public class Fitting
 		Point p2a = new Point( new double[]{ 100.0, 0.0 } );
 		Point p3a = new Point( new double[]{ 0.0, 200.0 } );
 		Point p4a = new Point( new double[]{ 100.0, 200.0 } );
+		Point p5a = new Point( new double[]{ 0.0, 0.0 } );
 
 		// l[] - local coordinates
 		Point p1b = new Point( new double[]{ 10.0, 20.0 } );
 		Point p2b = new Point( new double[]{ 110.0, 20.0 } );
 		Point p3b = new Point( new double[]{ 10.0, 220.0 } );
 		Point p4b = new Point( new double[]{ 110.0, 220.0 } );
+		Point p5b = new Point( new double[]{ 1000.0, 2000.0 } );
 
 		final Collection< PointMatch > matches = new ArrayList<>();
 		
@@ -31,7 +33,8 @@ public class Fitting
 		matches.add( new PointMatch( p2a, p2b ) );
 		matches.add( new PointMatch( p3a, p3b ) );
 		matches.add( new PointMatch( p4a, p4b ) );
-
+		matches.add( new PointMatch( p5a, p5b ) );
+		
 		for ( PointMatch pm : matches )
 			System.out.println( "p1(l[]): " + Util.printCoordinates( pm.getP1().getL() ) + " >> p2(l[]): " + Util.printCoordinates( pm.getP2().getL() ) );
 		System.out.println();
