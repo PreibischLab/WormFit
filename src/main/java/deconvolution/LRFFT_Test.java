@@ -1,7 +1,5 @@
 package deconvolution;
 
-import java.util.ArrayList;
-
 import mpicbg.imglib.algorithm.fft.FourierConvolution;
 import mpicbg.imglib.algorithm.mirror.MirrorImage;
 import mpicbg.imglib.container.constant.ConstantContainer;
@@ -13,64 +11,33 @@ public class LRFFT_Test
 	private Image<FloatType> image, weight, kernel1, kernel2;
 	Image<FloatType> viewContribution = null;
 	FourierConvolution<FloatType, FloatType> fftConvolution1, fftConvolution2;
-	protected int numViews = 0;
-	
-	/**
-	 * The rotation angle of the PSF, just for internal use
-	 */
-	public int angle;
 
-	ArrayList< LRFFT_Test > views;
-	
 	/**
 	 * Used to determine if the Convolutions already have been computed for the current iteration
 	 */
 	int i = -1;
-
-	public LRFFT_Test( final Image<FloatType> image, final Image<FloatType> weight, final Image<FloatType> kernel )
-	{
-		this( image, weight, kernel, 0 );
-	}
 	
-	public LRFFT_Test( final Image<FloatType> image, final Image<FloatType> weight, final Image<FloatType> kernel, final int angle )
+	public LRFFT_Test( final Image<FloatType> image, final Image<FloatType> weight, final Image<FloatType> kernel )
 	{
 		this.image = image;
 		this.kernel1 = kernel;
 		this.weight = weight;
-		this.angle = angle;
 	}
 
 	public LRFFT_Test( final Image<FloatType> image, final Image<FloatType> kernel )
 	{
-		this( image, kernel, 0 );
-	}
-	
-	public LRFFT_Test( final Image<FloatType> image, final Image<FloatType> kernel, final int angle )
-	{
-		this( image, new Image< FloatType > ( new ConstantContainer< FloatType >( image.getDimensions(), new FloatType( 1 ) ), new FloatType() ), kernel, angle );
+		this( image, new Image< FloatType > ( new ConstantContainer< FloatType >( image.getDimensions(), new FloatType( 1 ) ), new FloatType() ), kernel );
 	}
 
-	/**
-	 * @param numViews - the number of views in the acquisition, determines the exponential of the kernel
-	 */
-	protected void setNumViews( final int numViews ) { this.numViews = numViews; }
 	
 	/**
 	 * This method is called once all views are added to the {@link LRInput}
 	 */
-	protected void init( final ArrayList< LRFFT_Test > views ) 
+	protected LRFFT_Test init() 
 	{
-		this.views = views;
-		
 		// normalize kernel so that sum of all pixels == 1
 		AdjustInput.normImage( kernel1 );
 
-		if ( numViews == 0 )
-		{
-			System.out.println( "Warning, numViews was not set." );
-			numViews = 1;
-		}
-		
 		// compute the inverted kernel (switch dimensions)
 		this.kernel2 = computeInvertedKernel( this.kernel1 );
 		
@@ -87,6 +54,8 @@ public class LRFFT_Test
 		this.fftConvolution2.setNumThreads();
 		this.fftConvolution2.setKeepImgFFT( false );
 		//this.fftConvolution2.setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory<FloatType>() );
+
+		return this;
 	}
 	
 	public static Image<FloatType> computeExponentialKernel( final Image<FloatType> kernel, final int numViews )
@@ -130,7 +99,7 @@ public class LRFFT_Test
 	{
 		this.kernel1 = kernel;
 		
-		init( views );
+		init();
 
 		setCurrentIteration( -1 );
 	}
@@ -158,10 +127,8 @@ public class LRFFT_Test
 	@Override
 	public LRFFT_Test clone()
 	{
-		final LRFFT_Test viewClone = new LRFFT_Test( this.image.clone(), this.weight.clone(), this.kernel1.clone(), angle );
+		final LRFFT_Test viewClone = new LRFFT_Test( this.image.clone(), this.weight.clone(), this.kernel1.clone() );
 	
-		viewClone.numViews = numViews;
-		viewClone.views = views;
 		viewClone.i = i;
 		
 		viewClone.image.setName( this.image.getName() + " cloned" );

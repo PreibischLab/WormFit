@@ -48,6 +48,12 @@ public class AdjustInput
 		return sum.getSum();
 	}	
 
+	public static double normImage( final LRFFT_Test data )
+	{
+		final ArrayList< LRFFT_Test > l = new ArrayList< LRFFT_Test >();
+		l.add(  data );
+		return normAllImages( l );
+	}
 	public static double normAllImages( final ArrayList<LRFFT_Test> data )
 	{
 		// the individual sums of the overlapping area

@@ -1,9 +1,6 @@
 package deconvolution;
 
 import ij.IJ;
-
-import java.util.ArrayList;
-
 import mpicbg.imglib.algorithm.fft.FourierConvolution;
 import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.image.Image;
@@ -11,7 +8,7 @@ import mpicbg.imglib.type.numeric.real.FloatType;
 
 public class LucyRichardson implements Deconvolver
 {
-	final int numViews, numDimensions;
+	final int numDimensions;
 	final public static float minValue = 0.0001f;
     final float avg;
     final double lambda;
@@ -23,34 +20,31 @@ public class LucyRichardson implements Deconvolver
 	public Image<FloatType> psi;
 	
 	// the input data
-	final LRInput views;
-	final ArrayList<LRFFT_Test> data;
+	final LRFFT_Test data;
 	final String name;
 
 	
-	public LucyRichardson( final LRInput views, final double lambda, String name )
+	public LucyRichardson( final LRFFT_Test data, final double lambda, String name )
 	{
 		this.name = name;
-		this.data = views.getViews();
-		this.views = views;
-		this.numViews = data.size();
-		this.numDimensions = data.get( 0 ).getImage().getNumDimensions();
+		this.data = data;
+		this.numDimensions = data.getImage().getNumDimensions();
 		this.lambda = lambda;
 		
-		this.psi = data.get( 0 ).getImage().createNewImage( "psi (deconvolved image)" );
+		this.psi = data.getImage().createNewImage( "psi (deconvolved image)" );
 		
-		this.avg = (float)AdjustInput.normAllImages( data );
+		this.avg = (float)AdjustInput.normImage( data );
 		
-		//System.out.println( "Average intensity in overlapping area: " + avg );        
+		System.out.println( "Average intensity in overlapping area: " + avg );
 		
 		//
 		// the real data image psi is initialized with the average 
 		//	
 		for ( final FloatType f : psi )
-			f.set( avg );		
+			f.set( avg );
 	}
 
-	public LRInput getData() { return views; }
+	public LRFFT_Test getData() { return data; }
 	public String getName() { return name; }
 	public double getAvg() { return avg; }
 	
@@ -67,21 +61,13 @@ public class LucyRichardson implements Deconvolver
 		return d;
 	}
 
-	final private static DeconvolveRuntimeStatistics runIteration( final Image< FloatType> psi, final ArrayList<LRFFT_Test> data, 
+	final private static DeconvolveRuntimeStatistics runIteration( final Image< FloatType> psi, final LRFFT_Test processingData, 
 			final boolean tikhonov, final double lambda, final float minValue, final int iteration )
 	{
-		final int numViews = data.size();
-
-		// a different view at each iteration
-		//final int view = iteration % numViews;
 		
 		double sumChange = 0;
 		double maxChange = -1;
 
-		for ( int view = 0; view < numViews; ++view )
-		{
-			final LRFFT_Test processingData = data.get( view );
-			
 			// convolve psi (current guess of the image) with the PSF of the current view
 			final FourierConvolution<FloatType, FloatType> fftConvolution = processingData.getFFTConvolution1();
 			fftConvolution.replaceImage( psi );
@@ -169,7 +155,6 @@ public class LucyRichardson implements Deconvolver
 				// store the new value
 				lastPsi.set( (float)nextPsiValue );
 			}
-		}
 		
 		IJ.log("iteration: " + iteration + " --- sum change: " + sumChange + " --- max change per pixel: " + maxChange );
 		

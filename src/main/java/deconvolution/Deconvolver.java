@@ -8,7 +8,7 @@ public interface Deconvolver
 
 	public String getName();
 	public double getAvg();
-	public LRInput getData();
+	public LRFFT_Test getData();
 	
 	public Image<FloatType> getPsi();
 	public DeconvolveRuntimeStatistics runIteration();

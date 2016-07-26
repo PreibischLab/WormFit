@@ -10,18 +10,14 @@ import net.imglib2.img.Img;
 
 public class DeconvolveTest
 {
-	public static LRInput createInput( final Img< net.imglib2.type.numeric.real.FloatType > im, final Img< net.imglib2.type.numeric.real.FloatType > psf )
+	public static LRFFT_Test createInput( final Img< net.imglib2.type.numeric.real.FloatType > im, final Img< net.imglib2.type.numeric.real.FloatType > psf )
 	{
-		final LRInput deconvolutionData = new LRInput();
-
-		deconvolutionData.add( new LRFFT_Test( ImgLib2.wrapFloatToImgLib1( im.copy() ), ImgLib2.wrapFloatToImgLib1( psf.copy() ), 1 ) );
-		
-		return deconvolutionData;
+		return new LRFFT_Test( ImgLib2.wrapFloatToImgLib1( im.copy() ), ImgLib2.wrapFloatToImgLib1( psf.copy() ) );
 	}
 
-	public static void deconvolve( final LRInput deconvolutionData )
+	public static void deconvolve( final LRFFT_Test deconvolutionData )
 	{
-		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init(), 0.0, "independent (sequential)" );
+		final Deconvolver d = new LucyRichardson( deconvolutionData.init(), 0.0, "independent (sequential)" );
 
 		for ( int i = 0; i < 1000; ++ i )
 		{
