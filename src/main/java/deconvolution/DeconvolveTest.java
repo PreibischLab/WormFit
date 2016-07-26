@@ -5,11 +5,8 @@ import ij.ImagePlus;
 import java.util.Date;
 
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
-import mpicbg.imglib.outofbounds.OutOfBoundsStrategyValueFactory;
-import mpicbg.imglib.type.numeric.real.FloatType;
 import mpicbg.imglib.wrapper.ImgLib2;
 import net.imglib2.img.Img;
-import deconvolution.LRFFT_Test.PSFTYPE;
 
 public class DeconvolveTest
 {
@@ -24,7 +21,7 @@ public class DeconvolveTest
 
 	public static void deconvolve( final LRInput deconvolutionData )
 	{
-		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init( PSFTYPE.SIMPLE ), 0.0, "independent (sequential)" );
+		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init(), 0.0, "independent (sequential)" );
 
 		for ( int i = 0; i < 1000; ++ i )
 		{

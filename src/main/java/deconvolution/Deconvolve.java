@@ -6,12 +6,9 @@ import ij.ImagePlus;
 import java.util.ArrayList;
 import java.util.Date;
 
-import deconvolution.LRFFT_Test.PSFTYPE;
 import mpicbg.imglib.container.array.ArrayContainerFactory;
-import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
-import mpicbg.imglib.multithreading.SimpleMultiThreading;
 import mpicbg.imglib.type.numeric.real.FloatType;
 
 public class Deconvolve
@@ -39,18 +36,8 @@ public class Deconvolve
 			deconvolutionData.add( new LRFFT_Test( im, psf, i ) );
 		}
 
-		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init( PSFTYPE.SIMPLE ), 6.0E-4, "independent (sequential)" );
-		//new MAPG( deconvolutionData.clone().init( PSFTYPE.SIMPLE ) );
-		/*
-		final Image< FloatType > it = TestLR.open( "/Volumes/ExternalBay/SPIM/SPIMfixed/patrizia/2p_decon/it=100.tif", new ArrayContainerFactory() );
-		final Cursor< FloatType > c1 = d.getPsi().createCursor();
-		final Cursor< FloatType > c2 = it.createCursor();
-		
-		while ( c1.hasNext() )
-		{
-			c1.next().set( c2.next().get() );
-		}
-		*/
+		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init(), 6.0E-4, "independent (sequential)" );
+
 		for ( int i = 0; i < 110; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );

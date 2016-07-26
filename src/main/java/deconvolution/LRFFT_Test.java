@@ -5,15 +5,11 @@ import java.util.ArrayList;
 import mpicbg.imglib.algorithm.fft.FourierConvolution;
 import mpicbg.imglib.algorithm.mirror.MirrorImage;
 import mpicbg.imglib.container.constant.ConstantContainer;
-import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.image.Image;
-import mpicbg.imglib.outofbounds.OutOfBoundsStrategyValueFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 
 public class LRFFT_Test 
 {
-	public static enum PSFTYPE { SIMPLE, EXPONENT, CONDITIONAL, CONDITIONAL_NEW, MAPG };
-	
 	private Image<FloatType> image, weight, kernel1, kernel2;
 	Image<FloatType> viewContribution = null;
 	FourierConvolution<FloatType, FloatType> fftConvolution1, fftConvolution2;
@@ -23,8 +19,7 @@ public class LRFFT_Test
 	 * The rotation angle of the PSF, just for internal use
 	 */
 	public int angle;
-	
-	PSFTYPE type = PSFTYPE.SIMPLE;
+
 	ArrayList< LRFFT_Test > views;
 	
 	/**
@@ -63,9 +58,8 @@ public class LRFFT_Test
 	/**
 	 * This method is called once all views are added to the {@link LRInput}
 	 */
-	protected void init( final PSFTYPE type, final ArrayList< LRFFT_Test > views ) 
+	protected void init( final ArrayList< LRFFT_Test > views ) 
 	{
-		this.type = type;
 		this.views = views;
 		
 		// normalize kernel so that sum of all pixels == 1
@@ -77,119 +71,8 @@ public class LRFFT_Test
 			numViews = 1;
 		}
 		
-		if ( type == PSFTYPE.MAPG )
-		{	
-			this.kernel2 = null;
-		}
-		else if ( numViews == 1 || type == PSFTYPE.SIMPLE )
-		{
-			// compute the inverted kernel (switch dimensions)
-			this.kernel2 = computeInvertedKernel( this.kernel1 );			
-		}
-		else if ( type == PSFTYPE.CONDITIONAL )
-		{
-			// compute the kernel using conditional probabilities
-			// if this is x1, then compute
-			// P(x1|psi) * P(x2|x1) * P(x3|x1) * ... * P(xn|x1)
-			// where
-			// P(xi|x1) = P(x1|psi) convolved with P(xi|psi)
-			
-			// we first get P(x1|psi)
-			final Image< FloatType > tmp = computeInvertedKernel( this.kernel1.clone() );
-
-			// now convolve P(x1|psi) with all other kernels 
-			for ( final LRFFT_Test view : views )
-			{
-				if ( view != this )
-				{
-					final FourierConvolution<FloatType, FloatType> conv = new FourierConvolution<FloatType, FloatType>( computeInvertedKernel( this.kernel1.clone() ), ( view.kernel1 ) );
-					conv.setNumThreads();
-					conv.setKeepImgFFT( false );
-					conv.setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory<FloatType>() );
-					conv.process();
-					
-					// multiply with the kernel
-					final Cursor<FloatType> cursor = tmp.createCursor();
-					for ( final FloatType t : ( conv.getResult() ) )
-					{
-						cursor.fwd();
-						cursor.getType().set( t.get() * cursor.getType().get() );
-					}
-				}
-			}
-			
-			// norm the compound kernel
-			AdjustInput.normImage( tmp );
-						
-			// compute the inverted kernel
-			this.kernel2 = ( tmp );
-			
-			// close the temp image
-			//tmp.close();
-		}
-		else if ( type == PSFTYPE.CONDITIONAL_NEW )
-		{
-			// compute the compound kernel P_v^compound of the efficient bayesian multi-view deconvolution
-			// for the current view \phi_v(x_v)
-			//
-			// P_v^compound = P_v^{*} prod{w \in W_v} P_v^{*} \ast P_w \ast P_w^{*}
-			//              = P_v^{*} prod{w \in W_v} P_{W_v}^compound
-			
-			// we first get P_v^{*} -> * refers to the inverted coordinates
-			final Image< FloatType > tmp = computeInvertedKernel( this.kernel1.clone() );
-
-			// now for each view: w \in W_v
-			for ( final LRFFT_Test view : views )
-			{
-				if ( view != this )
-				{
-					// convolve first P_v^{*} with P_w
-					final FourierConvolution<FloatType, FloatType> conv1 = new FourierConvolution<FloatType, FloatType>( computeInvertedKernel( this.kernel1 ), view.kernel1 );
-					conv1.setNumThreads();
-					conv1.setKeepImgFFT( false );
-					conv1.setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory<FloatType>() );
-					conv1.process();
-					
-					//ImageJFunctions.show( conv1.getResult() );
-		
-					// and now convolve the result with P_w^{*}
-					final FourierConvolution<FloatType, FloatType> conv2 = new FourierConvolution<FloatType, FloatType>( conv1.getResult(), computeInvertedKernel( view.kernel1 ) );
-					conv2.setNumThreads();
-					conv2.setKeepImgFFT( false );
-					conv2.setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory<FloatType>() );
-					conv2.process();
-					
-					// multiply the result with P_v^{*} yielding the compound kernel
-					final Cursor<FloatType> cursor = tmp.createCursor();
-					for ( final FloatType t : ( conv2.getResult() ) )
-					{
-						cursor.fwd();
-						cursor.getType().set( t.get() * cursor.getType().get() );
-					}					
-				}
-			}
-			
-			// norm the compound kernel
-			AdjustInput.normImage( tmp );
-						
-			// set it as kernel2 of the deconvolution
-			this.kernel2 = ( tmp );									
-		}
-		else if ( type == PSFTYPE.EXPONENT )
-		{
-			// compute the squared kernel and its inverse
-			final Image< FloatType > exponentialKernel = computeExponentialKernel( this.kernel1, numViews );
-			
-			// norm the squared kernel
-			AdjustInput.normImage( exponentialKernel );
-			
-			// compute the inverted squared kernel
-			this.kernel2 = computeInvertedKernel( exponentialKernel );
-		}
-		else
-		{
-			throw new RuntimeException( "Kernel type not supported: " + type );
-		}
+		// compute the inverted kernel (switch dimensions)
+		this.kernel2 = computeInvertedKernel( this.kernel1 );
 		
 		//ImageJFunctions.show( this.kernel2 ).setTitle( "kernel2 of " + image.getName() );
 		
@@ -247,7 +130,7 @@ public class LRFFT_Test
 	{
 		this.kernel1 = kernel;
 		
-		init( type, views );
+		init( views );
 
 		setCurrentIteration( -1 );
 	}
@@ -278,7 +161,6 @@ public class LRFFT_Test
 		final LRFFT_Test viewClone = new LRFFT_Test( this.image.clone(), this.weight.clone(), this.kernel1.clone(), angle );
 	
 		viewClone.numViews = numViews;
-		viewClone.type = type;
 		viewClone.views = views;
 		viewClone.i = i;
 		

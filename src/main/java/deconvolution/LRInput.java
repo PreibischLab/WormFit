@@ -1,21 +1,16 @@
 package deconvolution;
 
 import ij.ImagePlus;
-import ij.ImageStack;
 import ij.io.Opener;
 import ij.process.ImageProcessor;
 
-import java.io.IOException;
 import java.util.ArrayList;
 
-import deconvolution.LRFFT_Test.PSFTYPE;
 import mpicbg.imglib.container.ContainerFactory;
 import mpicbg.imglib.cursor.LocalizableCursor;
 import mpicbg.imglib.cursor.LocalizablePlaneCursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.image.ImageFactory;
-import mpicbg.imglib.image.display.imagej.ImageJFunctions;
-import mpicbg.imglib.outofbounds.OutOfBoundsStrategyValueFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 
 public class LRInput 
@@ -37,14 +32,14 @@ public class LRInput
 	 * 
 	 * @return the same instance again for convinience
 	 */
-	public LRInput init( final PSFTYPE type )
+	public LRInput init()
 	{
 		for ( final LRFFT_Test view : views )
 		{
-			view.init( type, views );
+			view.init( views );
 
-			view.getFFTConvolution1().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
-			view.getFFTConvolution2().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
+			//view.getFFTConvolution1().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
+			//view.getFFTConvolution2().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
 		}
 
 		return this;
