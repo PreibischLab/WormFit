@@ -17,7 +17,7 @@ import mpicbg.imglib.type.numeric.real.FloatType;
 public class Deconvolve
 {
 	public final static float avgIntensity = 1;
-	public final float minValue = LucyRichardsonSeq.minValue;
+	public final float minValue = LucyRichardson.minValue;
 
 	public Deconvolve( final String[] images, final String[] psfs )
 	{
@@ -31,7 +31,7 @@ public class Deconvolve
 			final Image< FloatType > psf = LRInput.open( psfs[ i ], new ArrayContainerFactory() );
 		
 			AdjustInput.normImage( psf );
-			AdjustInput.adjustImage( im, LucyRichardsonSeq.minValue, avgIntensity );
+			AdjustInput.adjustImage( im, LucyRichardson.minValue, avgIntensity );
 			
 			ImageJFunctions.show( im );
 			ImageJFunctions.show( psf );
@@ -39,7 +39,7 @@ public class Deconvolve
 			deconvolutionData.add( new LRFFT_Test( im, psf, i ) );
 		}
 
-		final Deconvolver d = new LucyRichardsonSeq( deconvolutionData.clone().init( PSFTYPE.SIMPLE ), false, 6.0E-4, "independent (sequential)" );
+		final Deconvolver d = new LucyRichardson( deconvolutionData.clone().init( PSFTYPE.SIMPLE ), 6.0E-4, "independent (sequential)" );
 		//new MAPG( deconvolutionData.clone().init( PSFTYPE.SIMPLE ) );
 		/*
 		final Image< FloatType > it = TestLR.open( "/Volumes/ExternalBay/SPIM/SPIMfixed/patrizia/2p_decon/it=100.tif", new ArrayContainerFactory() );

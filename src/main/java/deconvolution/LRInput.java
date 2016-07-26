@@ -15,6 +15,7 @@ import mpicbg.imglib.cursor.LocalizablePlaneCursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.image.ImageFactory;
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
+import mpicbg.imglib.outofbounds.OutOfBoundsStrategyValueFactory;
 import mpicbg.imglib.type.numeric.real.FloatType;
 
 public class LRInput 
@@ -39,7 +40,12 @@ public class LRInput
 	public LRInput init( final PSFTYPE type )
 	{
 		for ( final LRFFT_Test view : views )
+		{
 			view.init( type, views );
+
+			view.getFFTConvolution1().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
+			view.getFFTConvolution2().setImageOutOfBoundsStrategy( new OutOfBoundsStrategyValueFactory< FloatType >( new FloatType( LucyRichardson.minValue ) ) );
+		}
 
 		return this;
 	}

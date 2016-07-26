@@ -9,7 +9,7 @@ import mpicbg.imglib.cursor.Cursor;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.type.numeric.real.FloatType;
 
-public class LucyRichardsonSeq implements Deconvolver
+public class LucyRichardson implements Deconvolver
 {
 	final int numViews, numDimensions;
 	final public static float minValue = 0.0001f;
@@ -26,12 +26,11 @@ public class LucyRichardsonSeq implements Deconvolver
 	final LRInput views;
 	final ArrayList<LRFFT_Test> data;
 	final String name;
-	final boolean kernelsUpdate;
+
 	
-	public LucyRichardsonSeq( final LRInput views, final boolean kernelsUpdate, final double lambda, String name )
+	public LucyRichardson( final LRInput views, final double lambda, String name )
 	{
 		this.name = name;
-		this.kernelsUpdate = kernelsUpdate;
 		this.data = views.getViews();
 		this.views = views;
 		this.numViews = data.size();
@@ -51,7 +50,6 @@ public class LucyRichardsonSeq implements Deconvolver
 			f.set( avg );		
 	}
 
-	public boolean kernelsUpdated() { return kernelsUpdate; }
 	public LRInput getData() { return views; }
 	public String getName() { return name; }
 	public double getAvg() { return avg; }
@@ -176,138 +174,6 @@ public class LucyRichardsonSeq implements Deconvolver
 		IJ.log("iteration: " + iteration + " --- sum change: " + sumChange + " --- max change per pixel: " + maxChange );
 		
 		return new DeconvolveRuntimeStatistics( maxChange, sumChange );
-	}
-
-	final private static void updateKernelIteration( final Image< FloatType> psi, final ArrayList<LRFFT_Test> data, 
-			final double lambda, final float minValue, final int iteration )
-	{		
-		final int numViews = data.size();
-
-		double sumChange = 0;
-		double maxChange = -1;
-
-		final Image< FloatType > psiNew = psi;// LRFFT.computeExponentialKernel( psi, numViews );
-		//LRInput.normImage( psiNew );
-		
-		//int view = k;
-		for ( int view = 0; view < numViews; ++view )
-		{
-			final LRFFT_Test processingData = data.get( view );
-			
-			// convolve kernel with psi (current guess of the image)
-			// it does not matter which way around, this way we have no boundary artifacts (which we get when we convolve the kernel and use mirroring)
-			final FourierConvolution<FloatType, FloatType> fftConvolution = new FourierConvolution<FloatType, FloatType>( psi, processingData.getKernel1() );
-			fftConvolution.process();
-			
-			final Image<FloatType> psiBlurred = fftConvolution.getResult();
-			
-			// compute quotient img/psiBlurred
-			final Cursor<FloatType> cursorImg = processingData.getImage().createCursor();
-			final Cursor<FloatType> cursorPsiBlurred = psiBlurred.createCursor();
-			
-			while ( cursorImg.hasNext() )
-			{
-				cursorImg.fwd();
-				cursorPsiBlurred.fwd();
-				
-				final float imgValue = cursorImg.getType().get();
-				final float psiBlurredValue = cursorPsiBlurred.getType().get();
-				
-				cursorPsiBlurred.getType().set( imgValue / psiBlurredValue );
-			}
-	
-			//ImageJFunctions.show( psiBlurred );
-			
-			cursorImg.close();
-			cursorPsiBlurred.close();
-			
-			// blur the residuals image with the kernel
-			final FourierConvolution<FloatType, FloatType> fftConvolution2 = new FourierConvolution<FloatType, FloatType>( psiBlurred, LRFFT_Test.computeInvertedKernel( psiNew ) );
-			fftConvolution2.process();
-	
-			//ImageJFunctions.show( fftConvolution2.getResult() );
-						
-			// the result from the previous iteration
-			final Cursor< FloatType > cursorKernel1 = processingData.getKernel1().createCursor();
-			final Cursor< FloatType > cursorIntegral = fftConvolution2.getResult().createCursor();
-			
-			//LRInput.normImage( fftConvolution2.getResult() );
-			
-			while ( cursorKernel1.hasNext() )
-			{
-				cursorKernel1.fwd();
-				cursorIntegral.fwd();
-				final float lastKernelValue = cursorKernel1.getType().get();
-				
-				double value = lastKernelValue * cursorIntegral.getType().get();
-	
-				if ( value > 0 )
-				{
-					//
-					// perform Tikhonov regularization if desired
-					//		
-					if ( lambda > 0 )
-						value = ( (float)( (Math.sqrt( 1.0 + 2.0*lambda*value ) - 1.0) / lambda ) );
-				}
-				else
-				{
-					value = minValue;
-				}
-				//
-				// get the final value and some statistics
-				//
-				final float nextKernelValue;
-				
-				if ( Double.isNaN( value ) )
-					nextKernelValue = (float)minValue;
-				else
-					nextKernelValue = (float)Math.max( minValue, value );
-				
-				final float change = Math.abs( lastKernelValue - nextKernelValue );				
-				sumChange += change;
-				maxChange = Math.max( maxChange, change );
-				
-				// store the new value
-				cursorKernel1.getType().set( (float)nextKernelValue );
-			}
-			
-			//
-			// update the other fourier convolutions with the new kernel
-			//
-			
-			// replace the fft for kernel1, the kernel itself is already updated
-			AdjustInput.normImage( processingData.getKernel1() );
-
-			//ImageJFunctions.show( processingData.getKernel1() );
-			//SimpleMultiThreading.threadHaltUnClean();
-
-			processingData.getFFTConvolution1().replaceKernel( processingData.getKernel1() );
-			
-			// compute the exponential kernel
-			final Image< FloatType > exponentialKernel = LRFFT_Test.computeExponentialKernel( processingData.getKernel1(), numViews );
-			
-			// norm the exponential kernel
-			AdjustInput.normImage( exponentialKernel );
-			
-			// replace it in the second fourier convolution
-			final Image< FloatType > kernel2 = LRFFT_Test.computeInvertedKernel( processingData.getKernel2() );
-			processingData.getFFTConvolution2().replaceKernel( kernel2 );
-			
-			// update the "original kernel2"
-			final Cursor< FloatType > c = processingData.getKernel2().createCursor();
-			
-			for ( final FloatType f : kernel2 )
-			{
-				c.fwd();
-				c.getType().set( f );
-			}
-		}
-		
-		IJ.log("------------------------------------------------");
-		IJ.log(" Kernel-Iteration: " + iteration );
-		IJ.log(" Kernel-Change: " + sumChange );
-		IJ.log(" Kernel-Max Change per Pixel: " + maxChange );
-		IJ.log("------------------------------------------------");			
 	}
 
 	@Override
