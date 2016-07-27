@@ -48,18 +48,18 @@ public class PreProcessImage
 		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( "src/main/resources/decon/dros-1-pb.tif" ) ); //psi_synthetic.tif" ) );
 		AdjustInput.adjustImage( ImgLib2.wrapFloatToImgLib1( img ), LucyRichardson.minValue, 1 );
 		Img< FloatType > convImg = img.copy();
-		Img< FloatType > psf = ImgLib2Util.openAs32Bit( new File( "src/main/resources/decon/psf-1b.tif" ) );
+		Img< FloatType > psf = ImgLib2Util.openAs32Bit( new File( "src/main/resources/decon/psf-shift.tif" ) );
 		AdjustInput.normImage( ImgLib2.wrapFloatToImgLib1( psf ) );
 
 		FFTConvolution< FloatType > conv = new FFTConvolution< FloatType >( convImg, psf );
 		conv.convolve();
 
-		//ImageJFunctions.show( img );
-		//ImageJFunctions.show( convImg );
+		ImageJFunctions.show( img );
+		ImageJFunctions.show( convImg );
 		//ImageJFunctions.show( cropConvolvedDros( img ) );
-		ImageJFunctions.show( cropConvolvedDros( convImg ) ).setTitle( "input" );
-		ImageJFunctions.show( psf ).setTitle( "psf" );
+		//ImageJFunctions.show( cropConvolvedDros( convImg ) ).setTitle( "input" );
+		//ImageJFunctions.show( psf ).setTitle( "psf" );
 
-		DeconvolveTest.deconvolve( DeconvolveTest.createInput( cropConvolvedDros( convImg ), psf ) );
+		DeconvolveTest.deconvolve( DeconvolveTest.createInput( ( convImg ), psf ) );
 	}
 }
