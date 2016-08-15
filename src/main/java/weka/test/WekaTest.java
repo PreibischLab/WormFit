@@ -36,25 +36,37 @@ public class WekaTest {
 		final RandomAccessibleInterval<T> src;
 		final RandomAccessibleInterval< T > dst;
 		final int n;
+		final WekaSegmentation segmentator;
 
-		public processThread( final ImagePortion task, final RandomAccessibleInterval<T> src, final RandomAccessibleInterval< T > dst)
+		public processThread( final ImagePortion task, final RandomAccessibleInterval<T> src, final RandomAccessibleInterval< T > dst, WekaSegmentation segmentator)
 		{
 			this.task = task;
 			this.src = src;
 			this.dst = dst;
 			this.n = src.numDimensions();
+			this.segmentator = segmentator;
 		}
 
 		@Override
 		public Void call() throws Exception{
-			final Cursor<T> cSrc = Views.iterable(src).localizingCursor();
-			final RandomAccess<T> rDst = dst.randomAccess();
+			
+			ImagePlus imp = ImageJFunctions.wrap(src, "");
+			
+			
+			// final Cursor<T> cSrc = Views.iterable(src).localizingCursor();
+			// final RandomAccess<T> rDst = dst.randomAccess();
 
-			cSrc.jumpFwd(task.getStartPosition());
+			// cSrc.jumpFwd(task.getStartPosition());
 
 			// do something with image 			
 			for (int j = 0; j < task.loopSize; ++j){
 				cSrc.fwd();
+				
+				// TODO: the segmentation should come here 
+				
+				
+				
+				
 				rDst.setPosition(cSrc);
 				rDst.get().set(cSrc.get());
 			}
@@ -108,15 +120,27 @@ public class WekaTest {
 
 	public static <T extends RealType<T>> void runParallelMethod(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> dst){
 		int numThreads = 4;
-		int numTasks = 16;
-
+		int numTasks = 16; 
+		// TODO: change numTasks to an array of chunks 
+		
+		// Weka code // Sequential
+		ImagePlus imp = ImageJFunctions.wrap(img, "");
+		WekaSegmentation segmentator = new WekaSegmentation(); 
+		
+		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); // OK! 
+		if (!isLoaded){
+			System.out.println("Problem loading classifier");
+			return;
+		}
+		
+		
 		// @Parallel : 
 		final ExecutorService taskExecutor = Executors.newFixedThreadPool( numThreads );
 		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
 
 		// @Parallel :
 		for (final ImagePortion task : divideIntoPortions(Views.iterable(img).size(), numTasks) )
-			taskList.add(new processThread< T >( task, img, dst ));
+			taskList.add(new processThread< T >( task, img, dst, segmentator));
 
 		try
 		{
