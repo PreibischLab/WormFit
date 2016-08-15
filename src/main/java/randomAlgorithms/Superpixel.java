@@ -3,6 +3,8 @@ package randomAlgorithms;
 import java.io.File;
 import java.util.ArrayList;
 
+import com.sun.j3d.utils.universe.ViewerAvatar;
+
 import ij.ImageJ;
 import net.imglib2.Cursor;
 import net.imglib2.Interval;
@@ -10,11 +12,15 @@ import net.imglib2.Point;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.algorithm.fft2.FFTConvolution;
 import net.imglib2.display.projector.RandomAccessibleProjector2D;
 import net.imglib2.img.Img;
+import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.NumericType;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.type.numeric.complex.ComplexFloatType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
 import util.ImgLib2Util;
@@ -24,7 +30,9 @@ public class Superpixel {
 	public static <T extends RealType<T>> void runSuperpixel(RandomAccessibleInterval<T> input, RandomAccessibleInterval<T> interval, 
 			RandomAccessibleInterval<T> output,
 			RandomAccessibleInterval<T> distance,
-			RandomAccessibleInterval<T> labels
+			RandomAccessibleInterval<T> labels,
+			RandomAccessibleInterval<T> tmp, 
+			RandomAccessibleInterval<T> kernel
 			){
 		final RandomAccessibleInterval<T> src = Views.interval(Views.extendMirrorSingle(input), interval);
 		// grid step
@@ -58,16 +66,42 @@ public class Superpixel {
 			}
 
 			if(hit){
-				C.add(new Point(lc)); // coordinates
+				Point center = new Point(lc);
+				
+				long[] minB = new long[input.numDimensions()];
+				long[] maxB = new long[input.numDimensions()];
+				for (int d = 0; d < input.numDimensions(); ++d){
+					minB[d] = center.getLongPosition(d) - 1;
+					maxB[d] = center.getLongPosition(d) + 1;
+					
+					// TODO: is it possible to adjust this part using views
+					if (minB[d] < 0) 
+						minB[d] = 0;
+					if (maxB[d] >= input.dimension(d)) 
+						maxB[d] = input.dimension(d) - 1;
+				}
+				
+				
+				C.add(center); // coordinates
 				// @DEBUG:
-				System.out.println(C.get(C.size() - 1).getIntPosition(0) + " " + C.get(C.size() - 1).getIntPosition(1));
+				// System.out.println(C.get(C.size() - 1).getIntPosition(0) + " " + C.get(C.size() - 1).getIntPosition(1));
 			}
+			
+			
+						
 
 			lc.fwd();
 		}
 
 		// TODO: move cluster center to the lowest gradient position in 3x3 neighborhood
+		// set the boundaries for the neighborhood
+	
+		// tmp = Views.interval(input, new long[]{}, new long[]{});
+		// new FFTConvolution<T>(tmp, kernel, new ArrayImgFactory<ComplexFloatType>()).convolve();
+		// // rotate the kernel
+		// new FFTConvolution<T>(tmp, kernel, new ArrayImgFactory<ComplexFloatType>()).convolve();
 
+		
 		for(Point center: C){
 			long[] minBoundary = new long[input.numDimensions()];
 			long[] maxBoundary = new long[input.numDimensions()];
@@ -121,6 +155,8 @@ public class Superpixel {
 
 		}
 
+		
+		
 	}
 
 
@@ -164,11 +200,15 @@ public class Superpixel {
 
 		final Img<FloatType> distance = img.factory().create(img, img.firstElement());
 		final Img<FloatType> labels = img.factory().create(img, img.firstElement());
+		
+		Img<FloatType> tmp = img.factory().create(new long[]{3, 3}, img.firstElement()); 
+		Img<FloatType> kernel = ArrayImgs.floats( new float[]{-1,0,1}, new long[]{1, 3});
+		
 
 		initialize(distance, new FloatType(Float.MAX_VALUE));
 		initialize(labels, new FloatType(-1.0f));
 
-		runSuperpixel(img, img, dst, distance, labels);
+		runSuperpixel(img, img, dst, distance, labels, tmp, kernel);
 		
 		new ImageJ();
 		ImageJFunctions.show(distance);
