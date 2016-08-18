@@ -6,10 +6,16 @@ import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
+import net.imglib2.img.ImgFactory;
+import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
+import spim.process.cuda.Block;
+import spim.process.cuda.BlockGeneratorFixedSizePrecise;
 import spim.process.fusion.FusionHelper;
 import weka.classifiers.Classifier;
 import weka.classifiers.trees.J48;
@@ -29,6 +35,7 @@ import java.util.concurrent.Future;
 import hr.irb.fastRandomForest.FastRandomForest;
 import ij.ImageJ;
 import ij.ImagePlus;
+import mpicbg.imglib.image.ImageFactory;
 
 public class WekaTest {
 
@@ -38,8 +45,6 @@ public class WekaTest {
 		final RandomAccessibleInterval< T > dst;
 		final int n;
 		final WekaSegmentation segmentator;
-		
-		
 
 		public processThread( final ImagePortion task, final RandomAccessibleInterval<T> src, final RandomAccessibleInterval< T > dst, WekaSegmentation segmentator)
 		{
@@ -85,7 +90,36 @@ public class WekaTest {
 		}
 	}
 
+	public static class processThreadBlock implements Callable<Void>{
+		RandomAccessibleInterval<FloatType> src; 	
+		final WekaSegmentation segmentator;
 
+		public processThreadBlock(RandomAccessibleInterval<FloatType> block, WekaSegmentation segmentator)
+		{
+			this.src = block;
+			this.segmentator = segmentator;
+		}
+
+		@Override
+		public Void call() throws Exception{
+			try
+			{
+				ImagePlus out1 = segmentator.applyClassifier(ImageJFunctions.wrap(src, ""), 0, false);
+				// Display classified image
+				out1.setTitle("");
+				out1.show();
+
+				// testFunction();
+			}
+			catch (Exception e ) {
+				// System.out.println(task.toString());
+				e.printStackTrace();
+			}
+
+			return null;
+		} 		
+
+	}
 
 
 	public static class ImagePortion
@@ -135,10 +169,8 @@ public class WekaTest {
 		public String toString() { return "Portion [" + min[0] + " ... " + max[0] + " ]" +  "[" + min[1] + " ... " + max[1] + " ]"; }
 	}
 
-
-
 	public static final Vector<ImagePortion> divideIntoPortions( final long[] dimensions, final int [] numPortions){
-		
+
 		final long[] threadChunkSize = new long[dimensions.length];
 		final long[] threadChunkMod = new long[dimensions.length];
 
@@ -191,7 +223,7 @@ public class WekaTest {
 		// TODO:  remove? 
 		ImagePlus imp = ImageJFunctions.wrap(img, "");
 		WekaSegmentation segmentator = new WekaSegmentation(imp); 
-		
+
 		segmentator.getMembranePatchSize(); // this one should be included in the size of the image
 
 		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); // OK! 
@@ -214,12 +246,12 @@ public class WekaTest {
 		}
 
 		// split only x axis
-		numTasks[0] = 3;
+		numTasks[0] = 3; // this one should be user defined
 
 		// @Parallel :
 		for (final ImagePortion task : divideIntoPortions(dimensions, numTasks) ){
 			taskList.add(new processThread< T >( task, img, dst, segmentator));
-			// System.out.println("taskes created");
+			// System.out.println("tasks created");
 		}
 
 		try
@@ -234,6 +266,103 @@ public class WekaTest {
 			e.printStackTrace();
 		}
 		taskExecutor.shutdown();
+
+	}
+
+	// this version uses Block implementation from spim reconstruction
+	// bacause Block is optimized for floats we use them here 
+	public static void runBlockMethod(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst){
+		// done this way to be able to use multiple block instances
+		// final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats( 384, 384 );
+		final long[] blockSize = new long[ ]{384, 384};
+		// block.dimensions( blockSize );
+
+		final long[] imgSize = new long[ img.numDimensions() ];
+		img.dimensions( imgSize );
+
+		// Weka code // Sequential
+		ImagePlus imp = ImageJFunctions.wrap(img, "");
+		WekaSegmentation segmentator = new WekaSegmentation(imp); 
+
+		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); // OK! 
+		if (!isLoaded){
+			System.out.println("Problem loading classifier");
+			// return;
+		}
+		else{
+			System.out.println("Loaded!");
+		}
+
+		final long[] kernelSize = new long[img.numDimensions()];
+		long kernel = (long) Math.max(segmentator.getMembranePatchSize(), segmentator.getMaximumSigma()); // this one should be included in the size of the image	
+		for (int d = 0; d < img.numDimensions(); ++d)
+			kernelSize[d] = kernel;	
+
+		final BlockGeneratorFixedSizePrecise blockGenerator = new BlockGeneratorFixedSizePrecise(blockSize);
+		final Block[] blocks = blockGenerator.divideIntoBlocks( imgSize, kernelSize ); 
+		
+		// TODO: not the best way to do this
+		final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats( blockSize[0], blockSize[1], blocks.length);
+		
+		// TODO: feed blocks to solver
+
+		int numTasks = blocks.length;
+		int numThreads = 4;
+ 
+		// @Parallel : 
+		final ExecutorService taskExecutor = Executors.newFixedThreadPool( numThreads );
+		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
+		
+		long idx = 0;
+		long[] min = new long[]{0, 0, 0};
+		long[] max = new long[]{blockSize[0] - 1, blockSize[1] - 1, 0};
+		for (final Block b : blocks){
+			min[img.numDimensions()] = idx;
+			max[img.numDimensions()] = idx;
+			
+			
+			for (int d = 0; d <= img.numDimensions(); ++d){
+				System.out.print(min[d] + " " + max[d] + " ");
+			}
+			System.out.println();
+			
+			// ImageJFunctions.show(Views.interval(block, min, max));
+			//throws exception that I can't check!
+			// b.copyBlock(Views.extendMirrorDouble(img) , Views.interval(block, min, max));
+
+			b.copyBlock(Views.extendMirrorDouble(img) , Views.hyperSlice(block, img.numDimensions(), idx));
+		
+			
+//			for ( final FloatType f : Views.iterable( Views.interval(block, min, max) ) ){
+//				f.set( idx + 10 );
+//				// System.out.println("Hello");
+//			}
+			// ImageJFunctions.show(Views.interval(block, min, max));
+			taskList.add(new processThreadBlock(Views.hyperSlice(block, img.numDimensions(), idx), segmentator));			
+			// b.pasteBlock(dst, Views.interval(block, min, max));
+			idx++;
+		}
+		ImageJFunctions.show(block);
+
+		try
+		{
+			// invokeAll() returns when all tasks are complete
+			// synchronization point
+			taskExecutor.invokeAll(taskList);
+
+		}
+		catch(final Exception e){
+			System.out.println( "Failed to invoke all tasks" + e );
+			e.printStackTrace();
+		}
+		taskExecutor.shutdown();
+		
+		idx = 0;
+		for (final Block b : blocks){
+			b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
+			idx++;
+		}
+
 
 	}
 
@@ -352,7 +481,12 @@ public class WekaTest {
 		// runMethod(image, labels, testImage);
 		// runMethod(testImage);
 
-		runParallelMethod(image, dst);
+		// runParallelMethod(image, dst);
+		// TODO: move this one to the function
+		
+		new ImageJ();
+
+		runBlockMethod(image, dst);
 
 		ImageJFunctions.show(image);
 		ImageJFunctions.show(dst);
