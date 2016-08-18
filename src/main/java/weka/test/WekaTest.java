@@ -91,12 +91,16 @@ public class WekaTest {
 	}
 
 	public static class processThreadBlock implements Callable<Void>{
+		Block b;
 		RandomAccessibleInterval<FloatType> src; 	
+		RandomAccessibleInterval<FloatType> dst;
 		final WekaSegmentation segmentator;
 
-		public processThreadBlock(RandomAccessibleInterval<FloatType> block, WekaSegmentation segmentator)
+		public processThreadBlock(Block b, RandomAccessibleInterval<FloatType> src, final RandomAccessibleInterval< FloatType > dst, WekaSegmentation segmentator)
 		{
-			this.src = block;
+			this.b = b;
+			this.src = src;
+			this.dst = dst;
 			this.segmentator = segmentator;
 		}
 
@@ -106,9 +110,11 @@ public class WekaTest {
 			{
 				ImagePlus out1 = segmentator.applyClassifier(ImageJFunctions.wrap(src, ""), 0, false);
 				// Display classified image
-				out1.setTitle("");
-				out1.show();
-
+				// out1.setTitle("");
+				// out1.show();
+				// b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
+				b.pasteBlock(dst, ImageJFunctions.wrap(out1));
+							
 				// testFunction();
 			}
 			catch (Exception e ) {
@@ -314,17 +320,17 @@ public class WekaTest {
 		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
 		
 		long idx = 0;
-		long[] min = new long[]{0, 0, 0};
-		long[] max = new long[]{blockSize[0] - 1, blockSize[1] - 1, 0};
+		// long[] min = new long[]{0, 0, 0};
+		// long[] max = new long[]{blockSize[0] - 1, blockSize[1] - 1, 0};
 		for (final Block b : blocks){
-			min[img.numDimensions()] = idx;
-			max[img.numDimensions()] = idx;
+			// min[img.numDimensions()] = idx;
+			// max[img.numDimensions()] = idx;
 			
 			
-			for (int d = 0; d <= img.numDimensions(); ++d){
-				System.out.print(min[d] + " " + max[d] + " ");
-			}
-			System.out.println();
+			// for (int d = 0; d <= img.numDimensions(); ++d){
+			// 	System.out.print(min[d] + " " + max[d] + " ");
+			// }
+			// System.out.println();
 			
 			// ImageJFunctions.show(Views.interval(block, min, max));
 			//throws exception that I can't check!
@@ -338,7 +344,9 @@ public class WekaTest {
 //				// System.out.println("Hello");
 //			}
 			// ImageJFunctions.show(Views.interval(block, min, max));
-			taskList.add(new processThreadBlock(Views.hyperSlice(block, img.numDimensions(), idx), segmentator));			
+			// taskList.add(new processThreadBlock(Views.hyperSlice(block, img.numDimensions(), idx), segmentator));			
+			taskList.add(new processThreadBlock(b, Views.hyperSlice(block, img.numDimensions(), idx), dst, segmentator));			
+			
 			// b.pasteBlock(dst, Views.interval(block, min, max));
 			idx++;
 		}
@@ -357,12 +365,12 @@ public class WekaTest {
 		}
 		taskExecutor.shutdown();
 		
-		idx = 0;
-		for (final Block b : blocks){
-			b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
-			idx++;
-		}
-
+//		idx = 0;
+//		for (final Block b : blocks){
+//			b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
+//			idx++;
+//		}
+		ImageJFunctions.show(dst).setTitle("This one should be the correct image");
 
 	}
 
