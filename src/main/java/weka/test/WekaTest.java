@@ -13,6 +13,7 @@ import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import spim.process.cuda.Block;
 import spim.process.cuda.BlockGeneratorFixedSizePrecise;
@@ -91,14 +92,14 @@ public class WekaTest {
 	}
 
 	public static class processThreadBlock implements Callable<Void>{
-		Block b;
-		RandomAccessibleInterval<FloatType> src; 	
-		RandomAccessibleInterval<FloatType> dst;
+		final Block block;
+		final RandomAccessibleInterval<FloatType> src; 	
+		final RandomAccessibleInterval<FloatType> dst;
 		final WekaSegmentation segmentator;
 
-		public processThreadBlock(Block b, RandomAccessibleInterval<FloatType> src, final RandomAccessibleInterval< FloatType > dst, WekaSegmentation segmentator)
+		public processThreadBlock(Block block, RandomAccessibleInterval<FloatType> src, final RandomAccessibleInterval< FloatType > dst, WekaSegmentation segmentator)
 		{
-			this.b = b;
+			this.block = block;
 			this.src = src;
 			this.dst = dst;
 			this.segmentator = segmentator;
@@ -108,20 +109,12 @@ public class WekaTest {
 		public Void call() throws Exception{
 			try
 			{
-				ImagePlus out1 = segmentator.applyClassifier(ImageJFunctions.wrap(src, ""), 0, false);
-				// Display classified image
-				// out1.setTitle("");
-				// out1.show();
-				// b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
-				b.pasteBlock(dst, ImageJFunctions.wrap(out1));
-							
-				// testFunction();
+				final ImagePlus out1 = segmentator.applyClassifier(ImageJFunctions.wrap(src, ""), 0, false);
+				block.pasteBlock(dst, ImageJFunctions.wrap(out1));
 			}
 			catch (Exception e ) {
-				// System.out.println(task.toString());
 				e.printStackTrace();
 			}
-
 			return null;
 		} 		
 
@@ -277,20 +270,16 @@ public class WekaTest {
 
 	// this version uses Block implementation from spim reconstruction
 	// bacause Block is optimized for floats we use them here 
-	public static void runBlockMethod(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst){
-		// done this way to be able to use multiple block instances
-		// final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats( 384, 384 );
-		final long[] blockSize = new long[ ]{384, 384};
-		// block.dimensions( blockSize );
+	public static void runBlockMethod(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst, RandomAccessibleInterval<FloatType> testImg, long[] blockSize){
+		int numDimensions = testImg.numDimensions();
+		final long[] testImgSize = new long[numDimensions];
+		testImg.dimensions( testImgSize );
 
-		final long[] imgSize = new long[ img.numDimensions() ];
-		img.dimensions( imgSize );
+		// Weka code
+		final ImagePlus imp = ImageJFunctions.wrap(img, "");
+		final WekaSegmentation segmentator = new WekaSegmentation(imp); 
+		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); 
 
-		// Weka code // Sequential
-		ImagePlus imp = ImageJFunctions.wrap(img, "");
-		WekaSegmentation segmentator = new WekaSegmentation(imp); 
-
-		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); // OK! 
 		if (!isLoaded){
 			System.out.println("Problem loading classifier");
 			// return;
@@ -299,56 +288,32 @@ public class WekaTest {
 			System.out.println("Loaded!");
 		}
 
-		final long[] kernelSize = new long[img.numDimensions()];
-		long kernel = (long) Math.max(segmentator.getMembranePatchSize(), segmentator.getMaximumSigma()); // this one should be included in the size of the image	
-		for (int d = 0; d < img.numDimensions(); ++d)
+		final long[] kernelSize = new long[numDimensions]; // used by classifier
+		long kernel = (long) Math.max(segmentator.getMembranePatchSize(), segmentator.getMaximumSigma()); 
+		// TODO: maybe for 3D z-axis offset is not necessary		
+		for (int d = 0; d < numDimensions; ++d)
 			kernelSize[d] = kernel;	
-
+		
 		final BlockGeneratorFixedSizePrecise blockGenerator = new BlockGeneratorFixedSizePrecise(blockSize);
-		final Block[] blocks = blockGenerator.divideIntoBlocks( imgSize, kernelSize ); 
 		
-		// TODO: not the best way to do this
-		final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats( blockSize[0], blockSize[1], blocks.length);
+		final Block[] blocks = blockGenerator.divideIntoBlocks( testImgSize, kernelSize ); 
+		final long [] extendedBlockSize = new long[numDimensions + 1]; // used as temporary storage
+		for (int d = 0; d < numDimensions; ++d)
+			extendedBlockSize[d] = blockSize[d];
+		extendedBlockSize[numDimensions] = blocks.length;
 		
-		// TODO: feed blocks to solver
+		final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats(extendedBlockSize);
+		
+		int numThreads = Runtime.getRuntime().availableProcessors(); // either predefine or give as a parameter
 
-		int numTasks = blocks.length;
-		int numThreads = 4;
- 
 		// @Parallel : 
 		final ExecutorService taskExecutor = Executors.newFixedThreadPool( numThreads );
 		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
 		
-		long idx = 0;
-		// long[] min = new long[]{0, 0, 0};
-		// long[] max = new long[]{blockSize[0] - 1, blockSize[1] - 1, 0};
-		for (final Block b : blocks){
-			// min[img.numDimensions()] = idx;
-			// max[img.numDimensions()] = idx;
-			
-			
-			// for (int d = 0; d <= img.numDimensions(); ++d){
-			// 	System.out.print(min[d] + " " + max[d] + " ");
-			// }
-			// System.out.println();
-			
-			// ImageJFunctions.show(Views.interval(block, min, max));
-			//throws exception that I can't check!
-			// b.copyBlock(Views.extendMirrorDouble(img) , Views.interval(block, min, max));
-
-			b.copyBlock(Views.extendMirrorDouble(img) , Views.hyperSlice(block, img.numDimensions(), idx));
-		
-			
-//			for ( final FloatType f : Views.iterable( Views.interval(block, min, max) ) ){
-//				f.set( idx + 10 );
-//				// System.out.println("Hello");
-//			}
-			// ImageJFunctions.show(Views.interval(block, min, max));
-			// taskList.add(new processThreadBlock(Views.hyperSlice(block, img.numDimensions(), idx), segmentator));			
-			taskList.add(new processThreadBlock(b, Views.hyperSlice(block, img.numDimensions(), idx), dst, segmentator));			
-			
-			// b.pasteBlock(dst, Views.interval(block, min, max));
-			idx++;
+		for (int idx = 0; idx < blocks.length; ++idx){
+			final IntervalView<FloatType> slice  = Views.hyperSlice(block, numDimensions, idx);	
+			blocks[idx].copyBlock(Views.extendMirrorDouble(testImg), slice);			
+			taskList.add(new processThreadBlock(blocks[idx], slice, dst, segmentator));			
 		}
 		ImageJFunctions.show(block);
 
@@ -364,14 +329,6 @@ public class WekaTest {
 			e.printStackTrace();
 		}
 		taskExecutor.shutdown();
-		
-//		idx = 0;
-//		for (final Block b : blocks){
-//			b.pasteBlock(dst, Views.hyperSlice(block, img.numDimensions(), idx));
-//			idx++;
-//		}
-		ImageJFunctions.show(dst).setTitle("This one should be the correct image");
-
 	}
 
 	public static <T extends RealType<T> & Comparable<T>> void compareRA(RandomAccessibleInterval<T> img1, RandomAccessibleInterval<T> img2){
@@ -481,7 +438,7 @@ public class WekaTest {
 		Img<FloatType> image = util.ImgLib2Util.openAs32Bit(new File(file + ".tif"));
 		Img<FloatType> labels = util.ImgLib2Util.openAs32Bit(new File(file + "Labeled.tif"));
 		Img<FloatType> testImage = util.ImgLib2Util.openAs32Bit(new File(file + "Test.tif"));
-		Img<FloatType> dst = image.factory().create(image, image.firstElement());
+		Img<FloatType> dst = image.factory().create(testImage, testImage.firstElement());
 
 		// Normalize.normalize(image, new FloatType(0),  new FloatType(255));
 		// Normalize.normalize(testImage, new FloatType(0),  new FloatType(255));
@@ -491,13 +448,14 @@ public class WekaTest {
 
 		// runParallelMethod(image, dst);
 		// TODO: move this one to the function
-		
+
 		new ImageJ();
+		
+		long[] blockSize = new long[]{384, 384};				
+		runBlockMethod(image, dst, testImage, blockSize);
 
-		runBlockMethod(image, dst);
-
-		ImageJFunctions.show(image);
-		ImageJFunctions.show(dst);
+		ImageJFunctions.show(testImage);
+		ImageJFunctions.show(dst).setTitle("This one should be the correct image");
 
 		compareRA(image, dst);
 
