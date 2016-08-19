@@ -354,10 +354,15 @@ public class WekaTest {
 
 		final long[] kernelSize = new long[numDimensions]; // used by classifier
 		long kernel = (long) Math.max(segmentator.getMembranePatchSize(), segmentator.getMaximumSigma()); 
-		// TODO: DONE! maybe for 3D z-axis offset is not necessary		
-		for (int d = 0; d < numDimensions - 1; ++d)
+		
+		for (int d = 0; d < numDimensions; ++d)
 			kernelSize[d] = kernel;	
-		kernelSize[numDimensions - 1] = 1;	// 0 gives wrong result for some reason
+		
+		// TODO: 2 if's below can be extended to nD case 
+		if (numDimensions == 3){
+			kernelSize[numDimensions - 1] = 1;	// 0 gives wrong result for some reason
+		}
+		
 		if ((numDimensions == 3) && (blockSize[numDimensions - 1] != 1)){
 			System.out.println("blockSize[" + (numDimensions - 1) + "] should be 1!\n" + "blockSize[" + (numDimensions - 1) + "] changed to 1!");
 			blockSize[numDimensions - 1] = 1;
