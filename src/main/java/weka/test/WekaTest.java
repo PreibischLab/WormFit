@@ -270,7 +270,7 @@ public class WekaTest {
 
 	// this version uses Block implementation from spim reconstruction
 	// bacause Block is optimized for floats we use them here 
-	public static void runBlockMethod(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst, RandomAccessibleInterval<FloatType> testImg, long[] blockSize){
+	public static void runBlockMethod3D(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst, RandomAccessibleInterval<FloatType> testImg, long[] blockSize){
 		int numDimensions = testImg.numDimensions();
 		final long[] testImgSize = new long[numDimensions];
 		testImg.dimensions( testImgSize );
@@ -293,29 +293,98 @@ public class WekaTest {
 		// TODO: maybe for 3D z-axis offset is not necessary		
 		for (int d = 0; d < numDimensions; ++d)
 			kernelSize[d] = kernel;	
-		
+
 		final BlockGeneratorFixedSizePrecise blockGenerator = new BlockGeneratorFixedSizePrecise(blockSize);
-		
+
 		final Block[] blocks = blockGenerator.divideIntoBlocks( testImgSize, kernelSize ); 
 		final long [] extendedBlockSize = new long[numDimensions + 1]; // used as temporary storage
 		for (int d = 0; d < numDimensions; ++d)
 			extendedBlockSize[d] = blockSize[d];
 		extendedBlockSize[numDimensions] = blocks.length;
-		
+
 		final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats(extendedBlockSize);
-		
+
 		int numThreads = Runtime.getRuntime().availableProcessors(); // either predefine or give as a parameter
 
 		// @Parallel : 
 		final ExecutorService taskExecutor = Executors.newFixedThreadPool( numThreads );
 		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
-		
+
 		for (int idx = 0; idx < blocks.length; ++idx){
 			final IntervalView<FloatType> slice  = Views.hyperSlice(block, numDimensions, idx);	
 			blocks[idx].copyBlock(Views.extendMirrorDouble(testImg), slice);			
 			taskList.add(new processThreadBlock(blocks[idx], slice, dst, segmentator));			
 		}
 		ImageJFunctions.show(block);
+
+		try
+		{
+			// invokeAll() returns when all tasks are complete
+			// synchronization point
+			taskExecutor.invokeAll(taskList);
+
+		}
+		catch(final Exception e){
+			System.out.println( "Failed to invoke all tasks" + e );
+			e.printStackTrace();
+		}
+		taskExecutor.shutdown();
+	}
+
+	// this version uses Block implementation from spim reconstruction
+	// because Block is optimized for floats we use them here 
+	// this version takes into account the fact that Weka performs segmentation slice by slice
+	public static void runBlockMethod(RandomAccessibleInterval<FloatType> img, RandomAccessibleInterval<FloatType> dst, RandomAccessibleInterval<FloatType> testImg, long[] blockSize){
+		int numDimensions = testImg.numDimensions();
+		final long[] testImgSize = new long[numDimensions];
+		testImg.dimensions( testImgSize );
+
+		// Weka code
+		final ImagePlus imp = ImageJFunctions.wrap(img, "");
+		final WekaSegmentation segmentator = new WekaSegmentation(imp); 
+		boolean isLoaded = segmentator.loadClassifier("src/main/resources/classifier.model"); 
+
+		if (!isLoaded){
+			System.out.println("Problem loading classifier");
+			// return;
+		}
+		else{
+			System.out.println("Loaded!");
+		}
+
+		final long[] kernelSize = new long[numDimensions]; // used by classifier
+		long kernel = (long) Math.max(segmentator.getMembranePatchSize(), segmentator.getMaximumSigma()); 
+		// TODO: DONE! maybe for 3D z-axis offset is not necessary		
+		for (int d = 0; d < numDimensions - 1; ++d)
+			kernelSize[d] = kernel;	
+		kernelSize[numDimensions - 1] = 1;	// 0 gives wrong result for some reason
+		if ((numDimensions == 3) && (blockSize[numDimensions - 1] != 1)){
+			System.out.println("blockSize[" + (numDimensions - 1) + "] should be 1!\n" + "blockSize[" + (numDimensions - 1) + "] changed to 1!");
+			blockSize[numDimensions - 1] = 1;
+		}
+		
+		final BlockGeneratorFixedSizePrecise blockGenerator = new BlockGeneratorFixedSizePrecise(blockSize);
+
+		final Block[] blocks = blockGenerator.divideIntoBlocks( testImgSize, kernelSize ); 
+		final long [] extendedBlockSize = new long[numDimensions + 1]; // used as temporary storage
+		for (int d = 0; d < numDimensions; ++d)
+			extendedBlockSize[d] = blockSize[d];
+		extendedBlockSize[numDimensions] = blocks.length;
+
+		final RandomAccessibleInterval< FloatType > block = ArrayImgs.floats(extendedBlockSize);
+
+		int numThreads = Runtime.getRuntime().availableProcessors(); // either predefine or give as a parameter
+
+		// @Parallel : 
+		final ExecutorService taskExecutor = Executors.newFixedThreadPool( numThreads );
+		final ArrayList< Callable<Void> > taskList = new ArrayList< Callable< Void > >(); 
+
+		for (int idx = 0; idx < blocks.length; ++idx){
+			final IntervalView<FloatType> slice  = Views.hyperSlice(block, numDimensions, idx);	
+			blocks[idx].copyBlock(Views.extendMirrorDouble(testImg), slice);			
+			taskList.add(new processThreadBlock(blocks[idx], slice, dst, segmentator));			
+		}
+		ImageJFunctions.show(block).setTitle("Generated blocks");
 
 		try
 		{
@@ -436,28 +505,18 @@ public class WekaTest {
 	public static void main(String args[]) throws Exception{
 		String file = "src/main/resources/input";
 		Img<FloatType> image = util.ImgLib2Util.openAs32Bit(new File(file + ".tif"));
-		Img<FloatType> labels = util.ImgLib2Util.openAs32Bit(new File(file + "Labeled.tif"));
-		Img<FloatType> testImage = util.ImgLib2Util.openAs32Bit(new File(file + "Test.tif"));
+		// Img<FloatType> labels = util.ImgLib2Util.openAs32Bit(new File(file + "Labeled.tif"));
+		Img<FloatType> testImage = util.ImgLib2Util.openAs32Bit(new File(file + "Test3Dsmall.tif"));
+		// Img<FloatType> testImage = util.ImgLib2Util.openAs32Bit(new File("src/main/resources/mri-stack.tif"));
+
 		Img<FloatType> dst = image.factory().create(testImage, testImage.firstElement());
 
-		// Normalize.normalize(image, new FloatType(0),  new FloatType(255));
-		// Normalize.normalize(testImage, new FloatType(0),  new FloatType(255));
-
-		// runMethod(image, labels, testImage);
-		// runMethod(testImage);
-
-		// runParallelMethod(image, dst);
-		// TODO: move this one to the function
-
 		new ImageJ();
-		
-		long[] blockSize = new long[]{384, 384};				
+
+		long[] blockSize = new long[]{155, 155, 1};	// TODO: last one should be always 1			
 		runBlockMethod(image, dst, testImage, blockSize);
-
-		ImageJFunctions.show(testImage);
-		ImageJFunctions.show(dst).setTitle("This one should be the correct image");
-
-		compareRA(image, dst);
+		ImageJFunctions.show(testImage).setTitle("Initial image");
+		ImageJFunctions.show(dst).setTitle("Segmented image");
 
 		// Done!
 		System.out.println("Doge!");
