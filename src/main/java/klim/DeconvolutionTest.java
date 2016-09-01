@@ -33,16 +33,15 @@ import util.ImgLib2Util;
 
 public class DeconvolutionTest {
 
+	// calculate the size of the offset
 	public static <T extends RealType<T>> void getOffset(RandomAccessibleInterval<T> psf, long [] offset){
-		for(int d = 0; d < psf.numDimensions(); ++d){
+		for(int d = 0; d < psf.numDimensions(); ++d)
 			offset[d] = psf.dimension(d)/2; 
-			// offset[d] = (d <= 1 ? 20 : 13);
-		}
 	}
 
 
 	public static <T extends RealType<T>> void getPsf(RandomAccessibleInterval<T> img, RandomAccessibleInterval<BitType> out, RandomAccessibleInterval<T> psf){
-		setZero(psf);
+		setZero(psf); // TODO: remove
 		T tVal = img.randomAccess().get().createVariable();
 		tVal.setReal(70);
 		Thresholding.threshold(img, out, tVal);
@@ -52,138 +51,91 @@ public class DeconvolutionTest {
 		PointSampleList<T> beads = new PointSampleList<T>(img.numDimensions());
 
 		ObjectSegmentation.findBeads(img, labeling, beads);
-		// TODO: remove beads with noise in the offset region
-
 		// offset for beads in all dimensions
 		long[] offset = new long[img.numDimensions()];
 		getOffset(psf, offset);
-
-		// @DEBUG: 
-		// for(int i =0; i < img.numDimensions(); ++i)
-		// 	System.out.println(offset[i]);
-
-		// not working yet! 
 		averagePsf(img, psf, beads, offset);
 
 	}
 
-	// TODO: ? becomes to complicated
-	public static <T extends RealType<T>> void setMinMax(long[] position, long[] min, long[] max, long[] offset, long[] imgMax, int n){
-		for (int d = 0; d < position.length; d++){
-			// TODO: this part should be fixed with mirroring strategy
-			min[d] = Math.max(position[d] - offset[d], 0);
-			max[d] = Math.min(position[d] + offset[d], imgMax[d]);
-			// System.out.print("[" + min[d] + " " + max[d] + "] ");
-		}
-	}
-
 	public static <T extends RealType<T>> void averagePsf(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf, PointSampleList<T> beads, long [] offset){
+		boolean isBroken = false; // bead initially is fine 
+		long numBrokenBeads = 0; // # of bad bead images
 		Cursor<T> cursor = beads.cursor();
 
-		long numBrokenBeads = 0;
-		boolean isFirst = true;
+		// this two store min/max for current bead window
+		long[] min = new long[img.numDimensions()];
+		long[] max = new long[img.numDimensions()]; 
+
 		while(cursor.hasNext()){
 			cursor.fwd();
-			// this two store min/max for current bead
-			long[] min = new long[img.numDimensions()];
-			long[] max = new long[img.numDimensions()]; // should this one be excluded ? 
-
-			long extra = 0;
+			isBroken = false;
 
 			for (int d = 0; d < img.numDimensions(); d++){
-				// TODO: FIXED: this part should be fixed with mirroring strategy
-				// To make calculations more precise we do not take into account broken psf's
 				min[d] = Math.max(cursor.getLongPosition(d) - offset[d], 0);
-				max[d] = Math.min(cursor.getLongPosition(d) + offset[d] + extra, img.max(d));
-				System.out.print("[" + min[d] + " " + max[d] + "] ");
-			}
-			// System.out.println("");
+				max[d] = Math.min(cursor.getLongPosition(d) + offset[d], img.max(d));	
+			}			
 
-			ImageJFunctions.show(Views.interval(img, min, max));
-
-			// check if the bead is far enough from the boundary 
-			boolean isFull = true; 
+			// check if bead is far enough from the boundaries 
 			for (int d = 0; d < img.numDimensions(); d++){
-				if ((max[d] - min[d] - extra) != 2*offset[d]){
-					isFull = false;
+				if ((max[d] - min[d]) != 2*offset[d]){
+					isBroken = true;
 					numBrokenBeads++;
 					break;
 				}
 			}
 
-			boolean isAlone = true; 
-			// TODO: here should come the check that the bead is alone in the pic
+			// check if bead is alone in the pic
+			if(!isBroken){ // -> O(N^2)
+				Cursor<T> jCursor = beads.cursor();
+				while(jCursor.hasNext()){
+					jCursor.fwd(); 	
+					boolean isSame = true;
+					for(int d = 0; d < img.numDimensions(); ++d)
+						if (jCursor.getLongPosition(d) != cursor.getLongPosition(d))
+							isSame = false;
+					
+					if(!isSame){ // not the same bead
+						boolean isInside = true;	
+						for (int d = 0; d < img.numDimensions(); d++){
+							if ((min[d] <= jCursor.getLongPosition(d)) && (jCursor.getLongPosition(d) <= max[d])){
 
-			if(isFull && isFirst && isAlone){
-				// isFirst = false;
-				
+							}
+							else{
+								isInside = false;
+								break;
+							}
+						}
+						if (isInside){
+							isBroken = true;
+							numBrokenBeads++;
+							break;
+						}
+					}
+				}
+			}
+
+
+			if(!isBroken){
+				ImageJFunctions.show(Views.interval(img, min, max));
 				accumulateData(Views.offset(Views.interval(img, min, max), min), psf);
-				ImageJFunctions.show(psf);
 			}
 		}
+
+		if ((beads.size()  - numBrokenBeads) > 0)// if not all beads are broken
+			getAverageValue(psf, (beads.size()  - numBrokenBeads));
 
 	}
 
-	// this function copies data from 
+	// this function adds data to psf
 	public static <T extends RealType<T>> void accumulateData(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf){
-
 		Cursor<T> c  = Views.iterable(img).cursor();
-		RandomAccess<T> r = psf.randomAccess();
-
-		T tmp = Views.iterable(img).firstElement();
-
-		// @Debug: check total number of elements
-
-		long [] total = new long[]{1, 1}; 
-		for(int d = 0; d < img.numDimensions(); ++d){
-			total[0] *= img.dimension(d);
-			total[1] *= psf.dimension(d);
-
-			System.out.println(img.dimension(d) + " ?= " + psf.dimension(d));
-		}
-
-		//42820
-
-		System.out.println(total[0] + " ?= " + total[1]);
-
-		long maxIdx = 45386;
-		long idx = 0;
-
-		long [] positions = new long[img.numDimensions()];
-
+		RandomAccess<T> r = psf.randomAccess();	
 		while(c.hasNext() ){
 			c.fwd();
-			c.localize(positions);
-
-			if(idx < 100){
-				for (int d = 0; d < img.numDimensions(); ++d)
-					System.out.print(positions[d] + " ");
-				System.out.println();
-			}
-			
-			
-			idx++;
-			if (idx >= maxIdx){
-				break;
-			}
 			r.setPosition(c);
-			r.localize(positions);
-			if(idx < 100){
-				for (int d = 0; d < img.numDimensions(); ++d)
-					System.out.print(positions[d] + " ");
-				System.out.println();
-				System.out.println("-------");
-			}
-			
-			
-			
-			//System.out.println(idx);
-			r.setPosition(c);
-			// c.get();
-			r.get().set(c.get());
+			r.get().add(c.get());
 		}
-
-
 	}
 
 	public static <T extends RealType<T>> void getAverageValue(RandomAccessibleInterval<T> psf, long total){
@@ -228,7 +180,7 @@ public class DeconvolutionTest {
 		getPsf(img, out, psf);		
 		ImageJFunctions.show(img).setTitle("Initial Image");
 		// TODO: ?!?!?!?!?!
-		ImageJFunctions.show(psf).setTitle("PSF Image");
+		ImageJFunctions.show(Views.rotate(psf, 0, 2)).setTitle("PSF Image");
 
 		// ImageJFunctions.show(out).setTitle("Thresholded Image");
 
