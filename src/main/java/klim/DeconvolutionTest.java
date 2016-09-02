@@ -42,6 +42,7 @@ public class DeconvolutionTest {
 
 	public static <T extends RealType<T>> void getPsf(RandomAccessibleInterval<T> img, RandomAccessibleInterval<BitType> out, RandomAccessibleInterval<T> psf){
 		setZero(psf); // TODO: remove
+		
 		T tVal = img.randomAccess().get().createVariable();
 		tVal.setReal(70);
 		Thresholding.threshold(img, out, tVal);
@@ -58,71 +59,92 @@ public class DeconvolutionTest {
 
 	}
 
+	// check if bead is far enough from the boundaries 
+	public static boolean isFar(long[] min, long[] max, long[] offset){	
+		boolean isBroken = false;	
+		for (int d = 0; d < min.length; d++){
+			if ((max[d] - min[d]) != 2*offset[d]){
+				isBroken = true;
+				break;
+			}
+		}
+		return isBroken;
+	}
+	
+	// check if the bead is alone in the cropped image
+	public static <T extends RealType<T>> boolean isAlone(long[] min, long[] max, long[] offset, long [] position, PointSampleList<T> beads){	
+		boolean isAlone = true;
+		Cursor<T> jCursor = beads.cursor();	
+		int numDimensions = min.length;
+		
+		while(jCursor.hasNext()){
+			jCursor.fwd(); 	
+			boolean isSame = true;
+			
+			for(int d = 0; d < numDimensions; ++d)
+				if (jCursor.getLongPosition(d) != position[d])
+					isSame = false;
+			
+			if(!isSame){ // not the same bead
+				boolean isInside = true;	
+				for (int d = 0; d < numDimensions; d++){
+					if ((min[d] > jCursor.getLongPosition(d)) || (jCursor.getLongPosition(d) > max[d])){
+						isInside = false;
+						break;
+					}
+				}
+				if (isInside){
+					isAlone = false;
+					break;
+				}
+			}
+		}
+				
+		return isAlone;
+	}
+	
 	public static <T extends RealType<T>> void averagePsf(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf, PointSampleList<T> beads, long [] offset){
 		boolean isBroken = false; // bead initially is fine 
 		long numBrokenBeads = 0; // # of bad bead images
-		Cursor<T> cursor = beads.cursor();
+		Cursor<T> iCursor = beads.cursor();
 
 		// this two store min/max for current bead window
 		long[] min = new long[img.numDimensions()];
 		long[] max = new long[img.numDimensions()]; 
+		
+		long[] position = new long[img.numDimensions()];
 
-		while(cursor.hasNext()){
-			cursor.fwd();
+		while(iCursor.hasNext()){
+			iCursor.fwd();
 			isBroken = false;
 
 			for (int d = 0; d < img.numDimensions(); d++){
-				min[d] = Math.max(cursor.getLongPosition(d) - offset[d], 0);
-				max[d] = Math.min(cursor.getLongPosition(d) + offset[d], img.max(d));	
-			}			
+				min[d] = Math.max(iCursor.getLongPosition(d) - offset[d], 0);
+				max[d] = Math.min(iCursor.getLongPosition(d) + offset[d], img.max(d));	
+			}		
+			
+			// if the bead (+ boundary) fits in the image
+			isBroken = isFar(min, max, offset);
+			if (isBroken){
+				numBrokenBeads++;
+			}
 
-			// check if bead is far enough from the boundaries 
-			for (int d = 0; d < img.numDimensions(); d++){
-				if ((max[d] - min[d]) != 2*offset[d]){
-					isBroken = true;
+			iCursor.localize(position);
+			// if the bead is alone in the cropped image
+			if (!isBroken){
+				isBroken = !isAlone(min, max, offset, position, beads);
+				if (isBroken){
 					numBrokenBeads++;
-					break;
 				}
 			}
-
-			// check if bead is alone in the pic
-			if(!isBroken){ // -> O(N^2)
-				Cursor<T> jCursor = beads.cursor();
-				while(jCursor.hasNext()){
-					jCursor.fwd(); 	
-					boolean isSame = true;
-					for(int d = 0; d < img.numDimensions(); ++d)
-						if (jCursor.getLongPosition(d) != cursor.getLongPosition(d))
-							isSame = false;
-					
-					if(!isSame){ // not the same bead
-						boolean isInside = true;	
-						for (int d = 0; d < img.numDimensions(); d++){
-							if ((min[d] <= jCursor.getLongPosition(d)) && (jCursor.getLongPosition(d) <= max[d])){
-
-							}
-							else{
-								isInside = false;
-								break;
-							}
-						}
-						if (isInside){
-							isBroken = true;
-							numBrokenBeads++;
-							break;
-						}
-					}
-				}
-			}
-
-
 			if(!isBroken){
-				ImageJFunctions.show(Views.interval(img, min, max));
+				// ImageJFunctions.show(Views.interval(img, min, max));
 				accumulateData(Views.offset(Views.interval(img, min, max), min), psf);
 			}
 		}
-
-		if ((beads.size()  - numBrokenBeads) > 0)// if not all beads are broken
+		
+		// if not all beads are broken
+		if ((beads.size()  - numBrokenBeads) > 0)
 			getAverageValue(psf, (beads.size()  - numBrokenBeads));
 
 	}
@@ -155,6 +177,7 @@ public class DeconvolutionTest {
 		}
 	}
 
+	// run deconvolution
 	public static <T extends FloatType> void runDeconvolution(Img<FloatType> img, Img<FloatType> psf){
 		AdjustInput.adjustImage( ImgLib2.wrapFloatToImgLib1( img ), LucyRichardson.minValue, 1 );
 		AdjustInput.normImage( ImgLib2.wrapFloatToImgLib1( psf ) );
@@ -171,7 +194,6 @@ public class DeconvolutionTest {
 
 		new ImageJ();
 
-
 		// TODO: check
 		float minValue =  0;
 		float maxValue = 255;
@@ -179,11 +201,7 @@ public class DeconvolutionTest {
 
 		getPsf(img, out, psf);		
 		ImageJFunctions.show(img).setTitle("Initial Image");
-		// TODO: ?!?!?!?!?!
 		ImageJFunctions.show(Views.rotate(psf, 0, 2)).setTitle("PSF Image");
-
-		// ImageJFunctions.show(out).setTitle("Thresholded Image");
-
 		// runDeconvolution(img, psf);
 
 		System.out.println("Doge!");
