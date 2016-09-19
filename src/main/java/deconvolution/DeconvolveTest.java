@@ -20,13 +20,16 @@ public class DeconvolveTest
 	{
 		final LucyRichardson d = new LucyRichardson( deconvolutionData, 1.0e-4 );
 
+		// will be used to show the result
 		ImageStack stack = null;
 
-		for ( int i = 0; i < 10000; ++ i )
+		// number of deconvolve iterations
+		for ( int i = 0; i < 300; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
 
+			// every, every 10th and every 100th 
 			if ( i < 10 || ( i < 100 && i % 10 == 0 ) || ( i >= 100 && i % 100 == 0 ) )
 			{
 				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() );
@@ -34,31 +37,33 @@ public class DeconvolveTest
 				if ( stack == null )
 					stack = new ImageStack( imp.getWidth(), imp.getHeight() );
 		
-				stack.addSlice( "iteration_"  + i, imp.getProcessor() );
+				imp.setSlice(0);
+				
+				stack.addSlice( "iteration_"  + i, imp.getProcessor());
 			}
 			
-			if ( i == 1000 )
+			if ( i == 500 )
 			{
 				ImagePlus impStack = new ImagePlus( "decon", stack );
 				impStack.show();
-				impStack.setRoi(15,39,615,274);
+				// impStack.setRoi(15,39,615,274);
 			}
 			
-			/*
-			if ( i > 0 && ( i == 10 ||  i == 50 || i % 100 == 0 ) )
+			
+			if ( i > 0 && ( i == 10 ||  i == 50 || i % 99 == 0 ) )
 			{
 				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() );
 				imp.setTitle( "it=" + i );
 				imp.resetDisplayRange();
 				imp.show();
 			}
-			*/
+			
 		}
 		
-		ImagePlus impStack = new ImagePlus( "decon", stack );
-		impStack.show();
-		impStack.setRoi(15,39,615,274);
+		// ImagePlus impStack = new ImagePlus( "decon", stack );
+		// impStack.show();
+		// impStack.setRoi(15,39,615,274);
 		
-		//ImageJFunctions.show( d.getPsi() );
+		ImageJFunctions.show( d.getPsi() );
 	}
 }

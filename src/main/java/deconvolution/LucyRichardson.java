@@ -81,7 +81,7 @@ public class LucyRichardson
 			else
 				cursor.getType().set( LucyRichardson.minValue );
 			
-			cursor.getType().set( 1.0f );
+			cursor.getType().set( 1.0f ); // ???
 		}
 
 		//for ( final FloatType f : psi )
