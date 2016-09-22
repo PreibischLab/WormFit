@@ -15,6 +15,7 @@ import net.imglib2.Interval;
 import net.imglib2.Point;
 import net.imglib2.PointSampleList;
 import net.imglib2.RandomAccess;
+import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.fft2.FFTConvolution;
 import net.imglib2.algorithm.stats.Normalize;
@@ -211,6 +212,30 @@ public class DeconvolutionTest {
 		DeconvolveTest.deconvolve( DeconvolveTest.createInput( ( img ), psf ) );
 	}
 
+
+	// this one will be implementation of the subpixel accuracy
+	public static <T extends FloatType> void subpixelAccuracy(Img<FloatType> img, Img<FloatType> psf){
+		// mpicbg.imglib.algorithm.peak
+	}
+	
+	// run the test case in 3D
+	public static void test3D(){
+		
+		String path = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( path + "DOTs-79-82.tif" ) ); 
+		Img <FloatType> psf = ImgLib2Util.openAs32Bit( new File( path + "PSF-done-50.tif" ) );
+		
+		Img< FloatType > convImg = img.copy();
+				
+		FFTConvolution< FloatType > conv = new FFTConvolution< FloatType >( convImg, psf );
+		conv.convolve();
+			
+		ImageJFunctions.show( img ).setTitle("initial image");
+		ImageJFunctions.show( convImg ).setTitle("convolved image");
+			
+		 runDeconvolution(img, psf);
+	}
+	
 	//  opens multiple files and extracts beads from them
 	public static void extractBeadsFromMultipleFiles(Img<FloatType> psf, int numImgs){
 		long totalBeads = 0;
@@ -230,14 +255,52 @@ public class DeconvolutionTest {
 		FloatType tVal = new FloatType(22.0f);
 		thresholdNoise(psf, tVal);
 	}
-		
-	public static void main(String[] args){	
-		new ImageJ();
-
+	
+	public static void mainDeconvolution(){
 		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( "/home/milkyklim/Desktop/latest_desktop/worm-piece.tif" ) ); 
 		Img <FloatType> psf = ImgLib2Util.openAs32Bit( new File( "/home/milkyklim/Desktop/latest_desktop/PSF-done-75.tif" ) );
 		runDeconvolution(img, psf);
+	}
 		
+	// test the total intensity 
+	public static <T extends FloatType> void testTotalIntensity(RandomAccessibleInterval<T> input, RandomAccessibleInterval<T> output){
+		T iTotal = input.randomAccess().get();
+		T oTotal = output.randomAccess().get();
+		iTotal.set(0);
+		oTotal.set(0);
+		
+		Cursor<T> iCursor = Views.iterable(input).cursor();
+		RandomAccess<T> oRandomAccess = output.randomAccess();
+		
+		while(iCursor.hasNext()){
+			iCursor.fwd();
+			oRandomAccess.setPosition(iCursor);
+			
+			iTotal.add(iCursor.get());
+			oTotal.add(oRandomAccess.get());		
+		}
+		
+		System.out.println("input = " + iTotal.get());
+		System.out.println("output = " + iTotal.get());
+		
+	}
+	
+	public static void runTestTotalIntensity(){
+		
+		String path = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		
+		Img <FloatType> input  = ImgLib2Util.openAs32Bit( new File(path + "DOTs-79-82.tif") ); 
+		Img <FloatType> output = ImgLib2Util.openAs32Bit( new File(path + "deconvoled-100.tif" ) );
+		
+		testTotalIntensity(input, output);			
+	}
+	
+	
+	public static void main(String[] args){	
+		new ImageJ();
+		
+		// test3D();
+		runTestTotalIntensity();
 		System.out.println("Doge!");
 
 	}

@@ -24,7 +24,7 @@ public class DeconvolveTest
 		ImageStack stack = null;
 
 		// number of deconvolve iterations
-		for ( int i = 0; i < 300; ++ i )
+		for ( int i = 0; i < 1000; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
