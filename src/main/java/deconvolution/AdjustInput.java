@@ -30,18 +30,16 @@ public class AdjustInput
 	{
 		final double sum = sumImage( img );	
 		
-		System.out.println(sum);
 		
-		
-		Cursor <FloatType> cursor = img.getDisplay().getImage().createCursor();
-		
-		while(cursor.hasNext()){
-			cursor.fwd();
-			cursor.getType().div( new FloatType((float)sum) );
-		}
+//		Cursor <FloatType> cursor = img.getDisplay().getImage().createCursor();
+//		
+//		while(cursor.hasNext()){
+//			cursor.fwd();
+//			cursor.getType().div( new FloatType((float)sum) );
+//		}
 
-//		for ( final FloatType t : img )
-//			t.set( (float) ((double)t.get() / sum) );
+		for ( final FloatType t : img )
+			t.set( (float) ((double)t.get() / sum) );
 		
 	}
 	

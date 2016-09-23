@@ -212,15 +212,12 @@ public class DeconvolutionTest {
 		AdjustInput.adjustImage(ImgLib2.wrapFloatToImgLib1(img), LucyRichardson.minValue, 1);
 
 		System.out.println("before: " + sumIntensities(psf));
-
-		// TODO: Maybe this function is wrong
+		// TODO: Maybe this function is wrong: no it is fine 
 		AdjustInput.normImage(ImgLib2.wrapFloatToImgLib1(psf));
-		// Normalize.normalize(psf, new FloatType(0.0f), new FloatType(1.0f));
-
 		System.out.println("after: " + sumIntensities(psf));
 
-		ImageJFunctions.show(psf);
-		ImageJFunctions.show(img);
+		ImageJFunctions.show(psf).setTitle("normalized psf");
+		ImageJFunctions.show(img).setTitle("adjusted image");
 
 		DeconvolveTest.deconvolve(DeconvolveTest.createInput((img), psf));
 	}
@@ -232,14 +229,14 @@ public class DeconvolutionTest {
 
 		String path = pathUbuntu;
 
-		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "worm-1.tif"));
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "psi (deconvolved image)-100.tif"));
 
-		System.out.println("before: " + sumIntensities(img));
+		System.out.println("before: " + sumIntensitiesInDouble(img));
 		
 		AdjustInput.normImage(ImgLib2.wrapFloatToImgLib1(img));
 		// Normalize.normalize(psf, new FloatType(0.0f), new FloatType(1.0f));
 
-		System.out.println("after: " + sumIntensities(img));
+		System.out.println("after: " + sumIntensitiesInDouble(img));
 		ImageJFunctions.show(img);
 
 	}
@@ -310,8 +307,8 @@ public class DeconvolutionTest {
 		T iTotal = input.randomAccess().get().copy();
 		T oTotal = output.randomAccess().get().copy();
 
-		iTotal.set(sumIntensities(input));
-		oTotal.set(sumIntensities(cropImage(output, psf)));
+		iTotal.set(sumIntensitiesInDouble(input));
+		oTotal.set(sumIntensitiesInDouble(cropImage(output, psf)));
 
 		System.out.println("input = " + iTotal.getRealFloat());
 		System.out.println("output = " + oTotal.getRealFloat());
@@ -336,6 +333,7 @@ public class DeconvolutionTest {
 	}
 
 	// calculates the sum over all
+	// TODO: FIX OVERFLOW
 	public static <T extends RealType<T>> T sumIntensities(RandomAccessibleInterval<T> img) {
 		T sum = img.randomAccess().get().copy();
 		sum.setZero();
@@ -347,6 +345,24 @@ public class DeconvolutionTest {
 		}
 
 		return sum;
+	}
+	
+	// calculates the sum over all
+	public static <T extends RealType<T>> T sumIntensitiesInDouble(RandomAccessibleInterval<T> img) {
+//		double sum = AdjustInput.sumImage(ImgLib2.wrapFloatToImgLib1( (Img<FloatType>) img ));
+		double sum = 0;
+		
+		Cursor<T> cursor = Views.iterable(img).cursor();
+
+		while (cursor.hasNext()) {
+			cursor.fwd();
+			sum += cursor.get().getRealDouble();
+		}
+
+		T result = img.randomAccess().get().copy();
+		result.setReal(sum);
+		
+		return result;
 	}
 
 	public static void runTestTotalIntensity() {
@@ -364,11 +380,11 @@ public class DeconvolutionTest {
 
 	public static void main(String[] args) {
 		new ImageJ();
-
+		
 		// testNormalization();
 		// test3D();
-		runTestTotalIntensity();
-		// mainDeconvolution();
+		// runTestTotalIntensity();
+		mainDeconvolution();
 		System.out.println("Doge!");
 
 	}

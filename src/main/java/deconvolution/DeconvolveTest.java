@@ -2,12 +2,15 @@ package deconvolution;
 
 import ij.ImagePlus;
 import ij.ImageStack;
+import klim.DeconvolutionTest;
 
 import java.util.Date;
 
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
+import mpicbg.imglib.wrapper.ImgLib1;
 import mpicbg.imglib.wrapper.ImgLib2;
 import net.imglib2.img.Img;
+import net.imglib2.type.numeric.real.FloatType;
 
 public class DeconvolveTest
 {
@@ -30,6 +33,7 @@ public class DeconvolveTest
 			d.runIteration();
 
 			// every, every 10th and every 100th 
+			
 			if ( i < 10 || ( i < 100 && i % 10 == 0 ) || ( i >= 100 && i % 100 == 0 ) )
 			{
 				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() );
@@ -57,6 +61,11 @@ public class DeconvolveTest
 				imp.resetDisplayRange();
 				imp.show();
 			}
+			
+			
+			System.out.println("image : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi())));
+			// TODO : kernels look okay : only the total energy for deconvolved images is decreasing
+			// System.out.println("kernel: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
 			
 		}
 		
