@@ -42,7 +42,6 @@ public class Superpixel {
 			RandomAccessibleInterval<T> tmp, 
 			RandomAccessibleInterval<T> kernel,
 
-
 			ArrayList<Point> clusters
 			){
 
@@ -140,7 +139,6 @@ public class Superpixel {
 
 		RandomAccess<T> raDistance = distance.randomAccess();
 		RandomAccess<T> raLabels = labels.randomAccess();
-
 
 
 
@@ -274,8 +272,6 @@ public class Superpixel {
 						pos[d] += cursor.getLongPosition(d);			
 				}
 
-
-
 				// System.out.println(objects.indexOf(one));
 				for (int d = 0; d < numDimensions; ++d)
 					pos[d] /= one.size();
@@ -283,20 +279,12 @@ public class Superpixel {
 				// System.out.println(pos[0] + " " + pos[1]);
 
 				clusters.add(new Point(pos));
-
-
 			}
 
 			int index = 2;
 			System.out.println(clusters.get(index).getLongPosition(0) + " " + clusters.get(index).getLongPosition(1));
-
-
 			// System.out.println(C.size());
-
 			// BoundingBox.setLabeling(thresholdImg, labeling);
-
-
-
 		}
 
 	}
@@ -393,7 +381,8 @@ public class Superpixel {
 	} 
 
 	public static void main(String[] args){
-		File file = new File("src/main/resources/LENNA.JPG");
+		String path = "src/main/resources/LENNA.JPG";
+		File file = new File(path);
 		final Img<FloatType> img = ImgLib2Util.openAs32Bit(file);
 		final Img<FloatType> dst = img.factory().create(img, img.firstElement());
 
