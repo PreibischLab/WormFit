@@ -27,6 +27,7 @@ import net.imglib2.type.logic.BitType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import klim.Thresholding;
 import mpicbg.imglib.algorithm.mirror.MirrorImage;
@@ -204,7 +205,14 @@ public class DeconvolutionTest {
 	// MAIN FUNCTION! run deconvolution
 	public static <T extends FloatType> void runDeconvolution(Img<FloatType> img, Img<FloatType> psf){
 		AdjustInput.adjustImage( ImgLib2.wrapFloatToImgLib1( img ), LucyRichardson.minValue, 1 );
-		AdjustInput.normImage( ImgLib2.wrapFloatToImgLib1( psf ) );
+		
+		System.out.println("before: " + sumIntensities(psf));
+		
+		// TODO: Maybe this function is wrong
+		// AdjustInput.normImage( ImgLib2.wrapFloatToImgLib1( psf ) );	
+		Normalize.normalize(psf, new FloatType(0.0f), new FloatType(1.0f));
+		
+		System.out.println("after: " + sumIntensities(psf));
 		
 		ImageJFunctions.show(psf);
 		ImageJFunctions.show(img);
@@ -233,7 +241,7 @@ public class DeconvolutionTest {
 		ImageJFunctions.show( img ).setTitle("initial image");
 		ImageJFunctions.show( convImg ).setTitle("convolved image");
 			
-		 runDeconvolution(img, psf);
+		runDeconvolution(img, psf);
 	}
 	
 	//  opens multiple files and extracts beads from them
@@ -263,26 +271,46 @@ public class DeconvolutionTest {
 	}
 		
 	// test the total intensity 
-	public static <T extends FloatType> void testTotalIntensity(RandomAccessibleInterval<T> input, RandomAccessibleInterval<T> output){
+	public static <T extends RealType<T>> void testTotalIntensity(RandomAccessibleInterval<T> input, RandomAccessibleInterval<T> output, RandomAccessibleInterval<T> psf){
 		T iTotal = input.randomAccess().get();
 		T oTotal = output.randomAccess().get();
-		iTotal.set(0);
-		oTotal.set(0);
 		
-		Cursor<T> iCursor = Views.iterable(input).cursor();
-		RandomAccess<T> oRandomAccess = output.randomAccess();
+		iTotal.set(sumIntensities(input));
+		oTotal.set(sumIntensities(cropImage(output, psf)));
+	
+		System.out.println("input = " + iTotal.getRealFloat());
+		System.out.println("output = " + oTotal.getRealFloat());
 		
-		while(iCursor.hasNext()){
-			iCursor.fwd();
-			oRandomAccess.setPosition(iCursor);
-			
-			iTotal.add(iCursor.get());
-			oTotal.add(oRandomAccess.get());		
+	}
+	
+	// drop boundaries
+	public static <T extends RealType<T>> IntervalView<T> cropImage(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf){
+		
+		long[] min = new long[img.numDimensions()];
+		long[] max = new long[img.numDimensions()];
+		
+		// why is it working ?  
+		for (int d = 0; d < img.numDimensions(); ++d ){
+			min[d] = psf.dimension(d)/2;
+			max[d] = img.dimension(d) - psf.dimension(d)/2 - 1;
 		}
 		
-		System.out.println("input = " + iTotal.get());
-		System.out.println("output = " + iTotal.get());
+		return Views.interval(img, min, max);
 		
+	}
+	
+	// calculates the sum over all
+	public static  <T extends RealType<T>> T sumIntensities(RandomAccessibleInterval<T> img){
+		T sum = img.randomAccess().get();
+		sum.setZero();
+		Cursor<T> cursor = Views.iterable(img).cursor();
+		
+		while(cursor.hasNext()){
+			cursor.fwd();
+			sum.add(cursor.get());		
+		}
+		
+		return sum;	
 	}
 	
 	public static void runTestTotalIntensity(){
@@ -291,16 +319,18 @@ public class DeconvolutionTest {
 		
 		Img <FloatType> input  = ImgLib2Util.openAs32Bit( new File(path + "DOTs-79-82.tif") ); 
 		Img <FloatType> output = ImgLib2Util.openAs32Bit( new File(path + "deconvoled-100.tif" ) );
+		Img <FloatType> psf    = ImgLib2Util.openAs32Bit( new File(path + "PSF-done-100.tif") ); 
 		
-		testTotalIntensity(input, output);			
+		testTotalIntensity(input, output, psf);			
 	}
 	
 	
 	public static void main(String[] args){	
 		new ImageJ();
 		
-		// test3D();
-		runTestTotalIntensity();
+		test3D();
+		// runTestTotalIntensity();
+		// mainDeconvolution();
 		System.out.println("Doge!");
 
 	}
