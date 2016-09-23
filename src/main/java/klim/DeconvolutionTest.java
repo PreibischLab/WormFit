@@ -221,7 +221,11 @@ public class DeconvolutionTest {
 	// run the test case in 3D
 	public static void test3D(){
 		
-		String path = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/20_09_16_psf_results/";
+		
+		String path = pathUbuntu;
+		
 		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( path + "DOTs-79-82.tif" ) ); 
 		Img <FloatType> psf = ImgLib2Util.openAs32Bit( new File( path + "PSF-done-50.tif" ) );
 		
@@ -233,7 +237,7 @@ public class DeconvolutionTest {
 		ImageJFunctions.show( img ).setTitle("initial image");
 		ImageJFunctions.show( convImg ).setTitle("convolved image");
 			
-		 runDeconvolution(img, psf);
+		runDeconvolution(img, psf);
 	}
 	
 	//  opens multiple files and extracts beads from them
@@ -257,8 +261,15 @@ public class DeconvolutionTest {
 	}
 	
 	public static void mainDeconvolution(){
-		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( "/home/milkyklim/Desktop/latest_desktop/worm-piece.tif" ) ); 
-		Img <FloatType> psf = ImgLib2Util.openAs32Bit( new File( "/home/milkyklim/Desktop/latest_desktop/PSF-done-75.tif" ) );
+		
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/20_09_16_psf_results/";
+		
+		String path = pathUbuntu;
+		
+		Img< FloatType > img = ImgLib2Util.openAs32Bit( new File( path + "DOTs-79-82.tif" ) ); 
+		Img <FloatType> psf = ImgLib2Util.openAs32Bit( new File( path + "PSF-done-50.tif" ) );
+		
 		runDeconvolution(img, psf);
 	}
 		
@@ -286,8 +297,10 @@ public class DeconvolutionTest {
 	}
 	
 	public static void runTestTotalIntensity(){
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/20_09_16_psf_results/";
 		
-		String path = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String path = pathUbuntu;
 		
 		Img <FloatType> input  = ImgLib2Util.openAs32Bit( new File(path + "DOTs-79-82.tif") ); 
 		Img <FloatType> output = ImgLib2Util.openAs32Bit( new File(path + "deconvoled-100.tif" ) );
@@ -299,8 +312,8 @@ public class DeconvolutionTest {
 	public static void main(String[] args){	
 		new ImageJ();
 		
-		// test3D();
-		runTestTotalIntensity();
+		test3D();
+		// runTestTotalIntensity();
 		System.out.println("Doge!");
 
 	}
