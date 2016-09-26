@@ -9,6 +9,7 @@ import java.util.Date;
 import mpicbg.imglib.image.display.imagej.ImageJFunctions;
 import mpicbg.imglib.wrapper.ImgLib1;
 import mpicbg.imglib.wrapper.ImgLib2;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
 import net.imglib2.type.numeric.real.FloatType;
 
@@ -63,9 +64,14 @@ public class DeconvolveTest
 			}
 			
 			
-			System.out.println("image : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi())));
+			System.out.println("image : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+			
+			double innerSum = DeconvolutionTest.sumIntensitiesInDouble(DeconvolutionTest.cropImage(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()), ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
+			System.out.println(innerSum);
+			
+			
 			// TODO : kernels look okay : only the total energy for deconvolved images is decreasing
-			// System.out.println("kernel: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
+			System.out.println("kernel: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
 			
 		}
 		

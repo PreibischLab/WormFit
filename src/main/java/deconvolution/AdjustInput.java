@@ -38,6 +38,9 @@ public class AdjustInput
 //			cursor.getType().div( new FloatType((float)sum) );
 //		}
 
+		
+		// some epsilon to check the stability
+		// double eps = 1e-10;
 		for ( final FloatType t : img )
 			t.set( (float) ((double)t.get() / sum) );
 		

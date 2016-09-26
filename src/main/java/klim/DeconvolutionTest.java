@@ -33,6 +33,7 @@ import klim.Thresholding;
 import mpicbg.imglib.algorithm.mirror.MirrorImage;
 import mpicbg.imglib.image.Image;
 import mpicbg.imglib.wrapper.ImgLib2;
+import mpicbg.util.RealSum;
 import util.ImgLib2Util;
 
 import mpicbg.imglib.wrapper.ImgLib2;
@@ -209,6 +210,8 @@ public class DeconvolutionTest {
 
 	// MAIN FUNCTION! run deconvolution
 	public static <T extends FloatType> void runDeconvolution(Img<FloatType> img, Img<FloatType> psf) {
+		for ( FloatType t : img )
+			t.add( new FloatType( 1 ));
 		AdjustInput.adjustImage(ImgLib2.wrapFloatToImgLib1(img), LucyRichardson.minValue, 1);
 
 		System.out.println("before: " + sumIntensities(psf));
@@ -329,7 +332,6 @@ public class DeconvolutionTest {
 		}
 
 		return Views.interval(img, min, max);
-
 	}
 
 	// calculates the sum over all
@@ -348,21 +350,17 @@ public class DeconvolutionTest {
 	}
 	
 	// calculates the sum over all
-	public static <T extends RealType<T>> T sumIntensitiesInDouble(RandomAccessibleInterval<T> img) {
-//		double sum = AdjustInput.sumImage(ImgLib2.wrapFloatToImgLib1( (Img<FloatType>) img ));
-		double sum = 0;
+	public static <T extends RealType<T>> double sumIntensitiesInDouble(RandomAccessibleInterval<T> img) {
+		RealSum sumR = new RealSum();
 		
 		Cursor<T> cursor = Views.iterable(img).cursor();
 
 		while (cursor.hasNext()) {
 			cursor.fwd();
-			sum += cursor.get().getRealDouble();
+			sumR.add( cursor.get().getRealDouble() );
 		}
 
-		T result = img.randomAccess().get().copy();
-		result.setReal(sum);
-		
-		return result;
+		return sumR.getSum();
 	}
 
 	public static void runTestTotalIntensity() {
