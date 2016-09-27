@@ -98,7 +98,7 @@ public class AdjustInput
 			
 			// sum up individual intensities
 			double sumLocal = 0;
-			int countLocal = 0;
+			long countLocal = 0;
 			
 			for ( int i = 0; i < cursorsImage.size(); ++i )
 			{
@@ -249,6 +249,21 @@ public class AdjustInput
 		return correction;
 	}
 
+	/**
+	 * Adjusts an image so that sum of the intensities is 1
+	 * 
+	 * @param image - the image to norm
+	 * @param ratio - the coefficient to multiply by 
+	 * 
+	 */
+	public static void adjustImage( final Image<FloatType> image, final double ratio)
+	{
+
+		for ( final FloatType t : image )
+			t.set( (float)( t.get() * ratio ) );
+		
+	}
+	
 	public static void addPoissonNoise( final Image<FloatType> img, final double SNR )
 	{
 		// based on an average intensity of 5, a multiplicator of 1 corresponds to a SNR of 2.23 = sqrt( 5 );	

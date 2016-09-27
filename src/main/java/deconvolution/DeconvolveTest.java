@@ -10,6 +10,7 @@ import mpicbg.imglib.image.display.imagej.ImageJFunctions;
 import mpicbg.imglib.wrapper.ImgLib1;
 import mpicbg.imglib.wrapper.ImgLib2;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
 import net.imglib2.type.numeric.real.FloatType;
 
@@ -26,9 +27,15 @@ public class DeconvolveTest
 
 		// will be used to show the result
 		ImageStack stack = null;
+		
+		// value 
+		double totalEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
+		double currentEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
+		// this coefficent will be used to adjust the total image intensity
+		double ratio = totalEnergy/currentEnergy;
 
 		// number of deconvolve iterations
-		for ( int i = 0; i < 1000; ++ i )
+		for ( int i = 0; i < 200; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
@@ -61,23 +68,21 @@ public class DeconvolveTest
 				imp.setTitle( "it=" + i );
 				imp.resetDisplayRange();
 				imp.show();
-			}
-			
-			
-			System.out.println("image : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
-			
-			double innerSum = DeconvolutionTest.sumIntensitiesInDouble(DeconvolutionTest.cropImage(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()), ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
-			System.out.println(innerSum);
-			
-			
-			// TODO : kernels look okay : only the total energy for deconvolved images is decreasing
-			System.out.println("kernel: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.data.getKernel2())));
-			
+			}					
 		}
 		
 		// ImagePlus impStack = new ImagePlus( "decon", stack );
 		// impStack.show();
 		// impStack.setRoi(15,39,615,274);
+		
+		
+		System.out.println("image before: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+		currentEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
+		ratio = totalEnergy/currentEnergy;
+		
+		// adjust the Image intensities so that they sum up to 1
+		AdjustInput.adjustImage(d.getPsi(), ratio);
+		System.out.println("image after : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		
 		ImageJFunctions.show( d.getPsi() );
 	}

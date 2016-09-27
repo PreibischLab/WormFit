@@ -293,13 +293,13 @@ public class DeconvolutionTest {
 
 	public static void mainDeconvolution() {
 
-		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
-		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/27_09_16_psf_results/";
+		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/27_09_16_psf_results/";
 
 		String path = pathUbuntu;
 
-		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "DOTs-79-82.tif"));
-		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "PSF-done-50.tif"));
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "worm-piece.tif"));
+		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "PSF-done-100.tif"));
 
 		runDeconvolution(img, psf);
 	}
