@@ -41,6 +41,8 @@ import net.imglib2.img.Img;
 
 public class DeconvolutionTest {
 
+	private static final boolean debug = true;
+
 	// calculate the size of the offset
 	public static <T extends RealType<T>> void getOffset(RandomAccessibleInterval<T> psf, long[] offset) {
 		for (int d = 0; d < psf.numDimensions(); ++d)
@@ -65,7 +67,25 @@ public class DeconvolutionTest {
 		ObjectSegmentation.findBeads(img, labeling, beads);
 		// offset for beads in all dimensions
 		long[] offset = new long[numDimensions];
-		getOffset(psf, offset);
+		getOffset(psf, offset); 
+
+		if (debug){
+			long [] min = new long [numDimensions];
+			long [] max = new long [numDimensions];
+
+			Cursor<T> beadsCursor = beads.cursor();
+			while (beadsCursor.hasNext()){
+				beadsCursor.fwd();
+				for(int d = 0; d < numDimensions; ++d){
+					min[d] = Math.max(0, beadsCursor.getLongPosition(d) - offset[d]);
+					max[d] = Math.min(img.dimension(d), beadsCursor.getLongPosition(d) + offset[d]);
+				}
+
+				ImageJFunctions.show(Views.interval(img, min, max));
+			}
+		}
+
+
 		long numBeads = 0; // total number of beads
 		numBeads = sumPsf(img, psf, beads, offset);
 		return numBeads;
@@ -164,7 +184,7 @@ public class DeconvolutionTest {
 		}
 
 		return (beads.size() - numBrokenBeads); // return number of clear
-												// non-broken beads
+		// non-broken beads
 	}
 
 	// this function adds data to psf
@@ -235,7 +255,7 @@ public class DeconvolutionTest {
 		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "psi (deconvolved image)-100.tif"));
 
 		System.out.println("before: " + sumIntensitiesInDouble(img));
-		
+
 		AdjustInput.normImage(ImgLib2.wrapFloatToImgLib1(img));
 		// Normalize.normalize(psf, new FloatType(0.0f), new FloatType(1.0f));
 
@@ -291,6 +311,26 @@ public class DeconvolutionTest {
 		thresholdNoise(psf, tVal);
 	}
 
+	public static void runExtractBeads(){
+		long totalBeads = 0;
+		String path = "/home/milkyklim/Desktop/input/";
+		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(new long[]{25,25, 51}, new FloatType());
+		Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "beads.tif"));
+		Img<BitType> out = new ArrayImgFactory<BitType>().create(beads, new BitType());
+
+		Normalize.normalize(beads, new FloatType(0), new FloatType(255));
+		float tVal = 180;
+		totalBeads += getPsf(beads, out, psf, new FloatType(tVal));
+
+
+		System.out.println("Total number of beads found: " + totalBeads);
+
+		getAverageValue(psf, totalBeads);
+		thresholdNoise(psf, new FloatType(10.0f));
+
+		ImageJFunctions.show(psf);
+	}
+
 	public static void mainDeconvolution() {
 
 		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/27_09_16_psf_results/";
@@ -300,6 +340,18 @@ public class DeconvolutionTest {
 
 		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "worm-piece.tif"));
 		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "PSF-done-100.tif"));
+
+		runDeconvolution(img, psf);
+	}
+
+	public static void mainDeconvolution2() {
+
+		String pathUbuntu = "/home/milkyklim/Desktop/input/";
+
+		String path = pathUbuntu;
+
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "sample-t=1.tif"));
+		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "psf-averaged-scaled.tif"));
 
 		runDeconvolution(img, psf);
 	}
@@ -348,11 +400,11 @@ public class DeconvolutionTest {
 
 		return sum;
 	}
-	
+
 	// calculates the sum over all
 	public static <T extends RealType<T>> double sumIntensitiesInDouble(RandomAccessibleInterval<T> img) {
 		RealSum sumR = new RealSum();
-		
+
 		Cursor<T> cursor = Views.iterable(img).cursor();
 
 		while (cursor.hasNext()) {
@@ -378,11 +430,12 @@ public class DeconvolutionTest {
 
 	public static void main(String[] args) {
 		new ImageJ();
-		
+
 		// testNormalization();
 		// test3D();
 		// runTestTotalIntensity();
-		mainDeconvolution();
+		// mainDeconvolution2();
+		runExtractBeads();
 		System.out.println("Doge!");
 
 	}
