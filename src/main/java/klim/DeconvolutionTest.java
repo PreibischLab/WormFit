@@ -503,6 +503,39 @@ public class DeconvolutionTest {
 		// ImageJFunctions.show(psf);
 	}
 	
+	public static <T extends RealType<T>> void setSliceValue(RandomAccessibleInterval<T> img, T val){
+		Cursor <T> cursor  = Views.iterable(img).localizingCursor();
+		long positionZ = 0; // indicates if the slice index is odd or even
+		
+		int lastDim = img.numDimensions() - 1;
+		
+		while(cursor.hasNext()){
+			cursor.fwd();
+			positionZ = cursor.getLongPosition(lastDim);
+			
+			if (positionZ % 2 == 1){
+				cursor.get().set(val);
+			}
+		}	
+		ImageJFunctions.show(img);
+	}
+	
+	public static void mainDeconvolutionSliced() {
+
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
+		String pathUbuntu = "/home/milkyklim/Desktop/latest_desktop/20_09_16_psf_results/";
+
+		String path = pathMac;
+
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "worm-piece.tif"));
+		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "PSF-done-75.tif"));
+		setSliceValue(img, new FloatType(-1));
+
+		runDeconvolution(img, psf);
+	}
+	
+	
+	
 	public static void main(String[] args) {
 		new ImageJ();
 
@@ -511,7 +544,8 @@ public class DeconvolutionTest {
 		// runTestTotalIntensity();
 		// mainDeconvolution2();
 		// runExtractBeads();
-		runGaussianFitting();
+		// runGaussianFitting();
+		mainDeconvolutionSliced();
 		System.out.println("Doge!");
 
 	}
