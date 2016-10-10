@@ -12,12 +12,18 @@ import ij.ImageJ;
 import ij.ImagePlus;
 import net.imglib2.Cursor;
 import net.imglib2.Interval;
+import net.imglib2.Localizable;
 import net.imglib2.Point;
 import net.imglib2.PointSampleList;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.fft2.FFTConvolution;
+import net.imglib2.algorithm.localization.DummySolver;
+import net.imglib2.algorithm.localization.FitFunction;
+import net.imglib2.algorithm.localization.Gaussian;
+import net.imglib2.algorithm.localization.MLGaussianEstimator;
+import net.imglib2.algorithm.localization.PeakFitter;
 import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
@@ -428,6 +434,75 @@ public class DeconvolutionTest {
 		testTotalIntensity(input, output, psf);
 	}
 
+	// this function to try out gaussian fitting 
+	public static <T extends RealType<T>> void gaussianFitting(RandomAccessibleInterval<T> img, RandomAccessibleInterval<BitType> out,  T tVal){
+		
+		int numDimensions = img.numDimensions();		
+		// detect high intensity pixels: candidates for bead centers
+		Thresholding.threshold(img, out, tVal);
+		final ImgLabeling<Integer, IntType> labeling = new ImgLabeling<Integer, IntType>(
+				new ArrayImgFactory<IntType>().create(out, new IntType()));
+		ObjectSegmentation.setLabeling(out, labeling);
+		PointSampleList<T> beads = new PointSampleList<T>(numDimensions);
+		ImageJFunctions.show(img);
+		ImageJFunctions.show(out);
+		
+		ObjectSegmentation.findBeads(img, labeling, beads);
+		
+		// System.out.println(beads.size());
+		
+		ArrayList<Localizable> peaks = new ArrayList<Localizable>(1);
+		
+		long [] position = new long[numDimensions];
+		
+		Cursor<T> cursorBeads = beads.cursor();
+		
+		while(cursorBeads.hasNext()){
+			cursorBeads.fwd();
+			cursorBeads.localize(position);
+			peaks.add(new Point(position));
+		}
+				
+		// beads.cursor();
+		// part above copied for test 
+		// why the fuck this error is here?!
+		PeakFitter<T> pf = new PeakFitter(img, peaks, new DummySolver(), new Gaussian(), new MLGaussianEstimator(20.0, numDimensions));
+		pf.process();
+		
+		// @DEBUG: 
+		// looks like parameters are returned in the following order
+		// x1, x2, x3, A, b
+		// @DEBUG: 
+		// maybe you need all elements that belong to the beads, not only central one
+		// that means you have to use water-shadding instead of thresholding
+		for (double[] element : pf.getResult().values()){
+			System.out.println("At least one element");
+			for (int i = 0; i < element.length; ++i){
+				System.out.println(i + " : " + element[i]);
+			}
+		}
+		
+		
+		System.out.println(pf.toString());
+	}
+	
+	public static void runGaussianFitting(){
+		String pathMac = "/Users/kkolyva/Desktop/28_09_16_severin/";
+		
+		String path = pathMac;
+		
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "bead.tif"));
+		Img<BitType> out = new ArrayImgFactory<BitType>().create(img, new BitType());
+		Normalize.normalize(img, new FloatType(0), new FloatType(255));
+		float tVal = 180;
+
+		thresholdNoise(img, new FloatType(10.0f));
+		
+		gaussianFitting(img, out, new FloatType(tVal));
+
+		// ImageJFunctions.show(psf);
+	}
+	
 	public static void main(String[] args) {
 		new ImageJ();
 
@@ -435,7 +510,8 @@ public class DeconvolutionTest {
 		// test3D();
 		// runTestTotalIntensity();
 		// mainDeconvolution2();
-		runExtractBeads();
+		// runExtractBeads();
+		runGaussianFitting();
 		System.out.println("Doge!");
 
 	}
