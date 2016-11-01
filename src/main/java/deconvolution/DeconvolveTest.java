@@ -75,7 +75,6 @@ public class DeconvolveTest
 		// impStack.show();
 		// impStack.setRoi(15,39,615,274);
 		
-		
 		System.out.println("image before: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		currentEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
 		ratio = totalEnergy/currentEnergy;
