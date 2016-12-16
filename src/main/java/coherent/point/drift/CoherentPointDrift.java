@@ -41,6 +41,7 @@ import util.opencsv.CSVWriter;
 public class CoherentPointDrift {
 
 	Img<FloatType> img;
+	ImagePlus imp;
 
 	int D = 2; // dimensionality of the point set
 	int N = 133; // # of points in the first point set
@@ -75,8 +76,33 @@ public class CoherentPointDrift {
 
 	// straight to the non-rigid registration
 
+	// these guys are necessary for proper coordinates adjustment
+	double[] translate;
+	double[] scale;
+	double[] sigma;
+
 	// constructor
 	public CoherentPointDrift() {
+		img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
+		w = 0.1f;
+		beta = 2;
+		lambda = 3;
+
+		mX = new Basic2DMatrix(N, D);
+		mY = new Basic2DMatrix(M, D);
+		mI = new Basic2DMatrix(N, D); // TODO: ??
+		mW = new Basic2DMatrix(M, D);
+		mG = new Basic2DMatrix(M, M);
+		mP = new Basic2DMatrix(M, N);
+
+		mT = new Basic2DMatrix(M, D);
+
+		mW.setAll(0);
+		// settings for ouput image
+		// these guys are necessary for proper coordinates adjustment
+		translate = new double[] { 250, 250 };
+		scale = new double[] { 150, 150 };
+		sigma = new double[] { 3, 3 };
 	}
 
 	/**
@@ -110,164 +136,148 @@ public class CoherentPointDrift {
 		}
 	}
 
-	// these guys are necessary for proper coordinates adjustment
-	double[] translate = new double[] { 250, 250 };
-	double[] scale = new double[] { 150, 150 };
-	double[] sigma = new double[] { 3, 3 };
-
+	// add points that has to be detected
 	public void addPoints(Img<FloatType> img) {
 		double[] location = new double[D];
-		// double [] sigma = new double [D];
-
-		// for (int d = 0; d <D; ++d ){
-		// sigma[d] = 3;
-		// }
-
 		for (int i = 0; i < N; ++i) {
 			for (int d = 0; d < D; ++d) {
 				location[d] = (mX.get(i, d) * scale[d] + translate[d]);
-				// System.out.print(location[d]);
 			}
-			// System.out.println();
+			// TODO: Use function from klim.utils
 			TestGauss3d.addGaussian(img, location, sigma);
 		}
 	}
 
-	// display output
-	
-	public void addOverlay(ImagePlus imp) {
-		// new ImageJ();
+	public void readData(Matrix X, Matrix Y) {
+		readCSV(); // reading is fine
+		normalize(mX);
+		normalize(mY);
+	}
+
+	/**
+	 * Shows coordinates defined by A in the imp image
+	 * 
+	 */
+	public void addOverlay(ImagePlus imp, Matrix A) {
+		int numDimensions = A.columns();
+		int numPoints = A.rows();
+
 		Overlay overlay = imp.getOverlay();
 		if (overlay == null) {
-			System.out.println("addOverlay: overlay is null!");
 			overlay = new Overlay();
-			imp.setOverlay(overlay);
 		}
 		overlay.clear();
 
-		// here should be the T coordinate of the fitted points
-		for (int i = 0; i < M; ++i) {
-			double[] xy = new double[D];
-			for (int d = 0; d < D; ++d) {
-				xy[d] = mT.get(i, d)*scale[d] + translate[d];
-				// System.out.print(xy[d] + " ");
+		double[] location = new double[numDimensions];
+		for (int i = 0; i < numPoints; ++i) {
+			for (int d = 0; d < numDimensions; ++d) {
+				location[d] = A.get(i, d) * scale[d] + translate[d];
 			}
-			// System.out.println();
-			final OvalRoi or = new OvalRoi(xy[0] - sigma[0], xy[1] - sigma[0], Util.round(2 * sigma[0]),
+			final OvalRoi or = new OvalRoi(location[0] - sigma[0], location[1] - sigma[0], Util.round(2 * sigma[0]),
 					Util.round(2 * sigma[1]));
 			or.setStrokeColor(Color.RED);
 			overlay.add(or);
 		}
 		imp.setOverlay(overlay);
-		// imp.updateAndDraw();
 	}
 
 	// normalize with zero mean and variance 1
 	// normalization along column
 	// TODO: this function is horrible cause it doesn't use the API of la4j
 	// but it is working!
-	public  void normalize(Matrix M){
+	public void normalize(Matrix M) {
 		double[] sumM = M.foldColumns(Vectors.asSumAccumulator(0.0));
 		// TODO: Rewrite using vectorization
-		for (int i =0; i < D; ++i){
+		for (int i = 0; i < D; ++i) {
 			sumM[i] /= M.getColumn(i).length();
 		}
-		
+
 		// System.out.println(sumM[0] + " " + sumM[1]);
-		
+
 		// TODO: Rewrite using vectorization
-		for (int i = 0; i < M.rows(); ++i){
-			for (int d = 0 ; d < D; ++d){
+		for (int i = 0; i < M.rows(); ++i) {
+			for (int d = 0; d < D; ++d) {
 				double val = M.get(i, d) - sumM[d];
 				M.set(i, d, val);
-			}	
-		}
-		
-		// debugResult(M, 0);	
-		double scaleVal = 0;
-		
-		for (int i = 0; i < M.rows(); ++i){
-			for (int d = 0; d < D; ++d){
-				scaleVal += M.get(i, d)*M.get(i, d);
 			}
 		}
-		
+
+		// debugResult(M, 0);
+		double scaleVal = 0;
+
+		for (int i = 0; i < M.rows(); ++i) {
+			for (int d = 0; d < D; ++d) {
+				scaleVal += M.get(i, d) * M.get(i, d);
+			}
+		}
+
 		scaleVal /= (M.rows());
 		scaleVal = Math.sqrt(scaleVal);
 		System.out.println(scaleVal);
-		
-		for (int i = 0; i < M.rows(); ++i){
-			for (int d = 0 ; d < D; ++d){
-				double val = M.get(i, d)/scaleVal;
+
+		for (int i = 0; i < M.rows(); ++i) {
+			for (int d = 0; d < D; ++d) {
+				double val = M.get(i, d) / scaleVal;
 				M.set(i, d, val);
-			}	
-		}		
+			}
+		}
 	}
 
-	public int runNonRigidRegistration(int flag) {
-		// initialization
-		// reading the files
-
-		mX = new Basic2DMatrix(N, D);
-		mY = new Basic2DMatrix(M, D);
-		mI = new Basic2DMatrix(N, D); // TODO: ??
-		mW = new Basic2DMatrix(M, D);
-		mG = new Basic2DMatrix(M, M);
-		mP = new Basic2DMatrix(M, N);
-
-		mT = new Basic2DMatrix(M, D);
-
-		mW.setAll(0);
-		// TODO: this assholes also do normalization for some reasons
-		readCSV(); // reading is fine
-		normalize(mX);
-		normalize(mY);
-	
-		img = new ArrayImgFactory<FloatType>().create(new long[]{500, 500}, new FloatType());
-		addPoints(img);
-		// img = ImgLib2Util.openAs32Bit(new File("/Users/kkolyva/Desktop/cpd_ex/worm-folded.tif"));
-
-		// need a container because not yet implemented in I2
-		final ImagePlus imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
-		imp.show();
-		// ImageJFunctions.show(img);
+	// calculates sigma squared
+	public double getSigma2(Matrix X, Matrix Y) {
+		long M = Y.rows();
+		long N = X.rows();
+		long D = X.columns(); // Y.columns();
+		
+		double res = 0;
 		// column-wise summation
-		double[] sumMX = mX.foldColumns(Vectors.asSumAccumulator(0.0));
-		double[] sumMY = mY.foldColumns(Vectors.asSumAccumulator(0.0));
+		double[] sumMX = X.foldColumns(Vectors.asSumAccumulator(0.0));
+		double[] sumMY = Y.foldColumns(Vectors.asSumAccumulator(0.0));
 
 		double sum = 0;
-
 		for (int d = 0; d < D; ++d)
 			sum += sumMX[d] * sumMY[d];
 
-		sigma2 = (double) (M * mX.transpose().multiplyByItsTranspose().trace()
-				+ N * mY.transpose().multiplyByItsTranspose().trace() - 2 * sum) / (M * N * D);
+		res = (double) (M * X.transpose().multiplyByItsTranspose().trace()
+				+ N * Y.transpose().multiplyByItsTranspose().trace() - 2 * sum) / (M * N * D);
 
-		System.out.println("sigma2 : " + sigma2);
-		
+		return res;
+	}
 
+	// calculates G matrix
+	// G might be symmetric 
+	public void calculateG(Matrix Y, Matrix G){
+		long M = Y.rows();
 		
-		
-		w = 0.1f;
-		beta = 2;
-		lambda = 3;
-
 		// there might be a better way for this part
+		// 
 		for (int i = 0; i < M; ++i) {
 			for (int j = 0; j < M; ++j) {
-				double val = (double) mY.getRow(i).subtract(mY.getRow(j)).norm();
+				double val = (double) Y.getRow(i).subtract(Y.getRow(j)).norm();
 				val *= -val / (2 * beta * beta);
-				mG.set(i, j, Math.exp(val));
+				G.set(i, j, Math.exp(val));
 			}
 		}
+	}
+	
+	public int runNonRigidRegistration(int flag) {
+		readData(mX, mY);
+		// fill image with points that has to be detected
+		addPoints(img);
+		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
+		imp.show();
+		
+		sigma2 = getSigma2(mX, mY);
+
+		System.out.println("sigma2 : " + sigma2);
+
+
 		// stuff above looks valid
 		// G looks correct at the moment
-		
-		
 
 		mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
-		addOverlay(imp);
-		
+		addOverlay(imp, mT);
+
 		int counter = 0;
 		while (counter++ < 30) {
 
@@ -352,7 +362,7 @@ public class CoherentPointDrift {
 			System.out.println(sigma2);
 
 			// if (true) return 0;
-			addOverlay(imp);
+			addOverlay(imp, mT);
 		}
 
 		// writeCSV();
