@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import org.la4j.LinearAlgebra;
 import org.la4j.Matrices;
 import org.la4j.Matrix;
 import org.la4j.Vector;
@@ -250,7 +251,8 @@ public class CoherentPointDrift {
 		long M = Y.rows();
 		
 		// there might be a better way for this part
-		// 
+		// TODO: make an upper/lower triangle matrix
+		// G is symmetric
 		for (int i = 0; i < M; ++i) {
 			for (int j = 0; j < M; ++j) {
 				double val = (double) Y.getRow(i).subtract(Y.getRow(j)).norm();
@@ -260,6 +262,8 @@ public class CoherentPointDrift {
 		}
 	}
 	
+	// TODO: rewrite all assignments -> in place!
+	
 	public int runNonRigidRegistration(int flag) {
 		readData(mX, mY);
 		// fill image with points that has to be detected
@@ -268,19 +272,16 @@ public class CoherentPointDrift {
 		imp.show();
 		
 		sigma2 = getSigma2(mX, mY);
+		calculateG(mY, mG);
 
-		System.out.println("sigma2 : " + sigma2);
-
-
-		// stuff above looks valid
-		// G looks correct at the moment
-
-		mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
+		// mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
+		mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 		addOverlay(imp, mT);
-
+	
 		int counter = 0;
 		while (counter++ < 30) {
-
+			// TODO: should be info for current iteration 
+			// # +  error 
 			System.out.println("ITERATION #" + counter);
 
 			// TODO: OPTIMIZE
@@ -302,39 +303,22 @@ public class CoherentPointDrift {
 				}
 			}
 
-			// TODO: I think that should be N instead of M here
-			// TODO: FIXED: check if this thing is correct at all
-			BasicVector ones = BasicVector.constant(N, 1);
-			Vector invP = mP.multiply(ones);
-			// Up to here output is correct
+			// BasicVector ones = BasicVector.constant(N, 1)
+			Vector invP = mP.multiply(BasicVector.constant(N, 1));
+			// TODO: Rewrite function below
+			// use in build functions
 			invP.update(INV2_FUNCTION); // you will reuse this value !!
-			// Up to here output is correct
-			// debugResult(invP);
-			// if (true) return 0;
 
-			// TODO: now you know that the parameters are fine!
-			// check out the values in the left handside and right hand side
-			// after that adjust the solver
-
-			// the left hand side is calculated correctly
-			// check the right hand-side
-
-			System.out.println(sigma2 + " : " + lambda);
-
-			// Problem pops up after this statement
-
+			// using least square method here
 			for (int d = 0; d < D; ++d) {
-				// mW.setColumn(d, new
-				// GaussianSolver(mG.add(invP.toDiagonalMatrix().multiply(sigma2
-				// * lambda))).solve(
-				// (invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY).getColumn(d)));
 				mW.setColumn(d, new LeastSquaresSolver(mG.add(invP.toDiagonalMatrix().multiply(sigma2 * lambda)))
 						.solve((invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY).getColumn(d)));
 			}
 
 			double N_P = (double) mP.sum();
-			mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
-
+			//mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
+			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
+			
 			// debugResult(mT, 0);
 			// if (true) return 0;
 
