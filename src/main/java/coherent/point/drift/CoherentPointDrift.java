@@ -44,18 +44,12 @@ public class CoherentPointDrift {
 	Img<FloatType> img;
 	ImagePlus imp;
 
-	int D = 2; // dimensionality of the point set
-	int N = 133; // # of points in the first point set
-	int M = 112; // # of points in the second point set
-	double[] X; // first point set N x D
-	double[] Y; // second point set M x D
-	double[] I; // (in theory) identity matrix
+	// TODO: read this parameters from file or from variable
+	final int D; // dimensionality of the point set
+	final int N; // # of points in the first point set
+	final int M; // # of points in the second point set
 
-	double[] W; // matrix of coefficients M x D
 	double sigma2; // TODO: 2 for squared
-
-	double[] G;
-	double[] P; // probability matrix
 
 	// parameters
 	double w; // amount of noise [0, 1]
@@ -66,14 +60,14 @@ public class CoherentPointDrift {
 	// maximum likelihood fit and regularization.
 
 	// TODO: convert stuff to the HPC
-	Basic2DMatrix mX; // N D
-	Basic2DMatrix mY; // M D
-	Basic2DMatrix mI; //
-	Basic2DMatrix mW; // M D
-	Basic2DMatrix mG; // M M
-	Basic2DMatrix mP; // M N
+	final Matrix mX; // N D
+	final Matrix mY; // M D
+	final Matrix mI; //
+	final Matrix mW; // M D
+	final Matrix mG; // M M
+	final Matrix mP; // M N
 
-	Basic2DMatrix mT; // M D transformation matrix
+	final Matrix mT; // M D transformation matrix
 
 	// straight to the non-rigid registration
 
@@ -83,11 +77,17 @@ public class CoherentPointDrift {
 	double[] sigma;
 
 	// constructor
-	public CoherentPointDrift() {
-		img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
-		w = 0.1f;
-		beta = 2;
-		lambda = 3;
+	public CoherentPointDrift(Img<FloatType> img, int N, int M, int D, double w, double beta, double lambda) {
+
+		this.img = img;
+
+		this.w = w;
+		this.beta = beta;
+		this.lambda = lambda;
+
+		this.D = D; // dimensionality of the point set
+		this.N = N; // # of points in the first point set
+		this.M = M; // # of points in the second point set
 
 		mX = new Basic2DMatrix(N, D);
 		mY = new Basic2DMatrix(M, D);
@@ -101,6 +101,7 @@ public class CoherentPointDrift {
 		mW.setAll(0);
 		// settings for ouput image
 		// these guys are necessary for proper coordinates adjustment
+		// TODO: make this things calculated automatically
 		translate = new double[] { 250, 250 };
 		scale = new double[] { 150, 150 };
 		sigma = new double[] { 3, 3 };
@@ -229,7 +230,7 @@ public class CoherentPointDrift {
 		long M = Y.rows();
 		long N = X.rows();
 		long D = X.columns(); // Y.columns();
-		
+
 		double res = 0;
 		// column-wise summation
 		double[] sumMX = X.foldColumns(Vectors.asSumAccumulator(0.0));
@@ -246,10 +247,10 @@ public class CoherentPointDrift {
 	}
 
 	// calculates G matrix
-	// G might be symmetric 
-	public void calculateG(Matrix Y, Matrix G){
+	// G might be symmetric
+	public void calculateG(Matrix Y, Matrix G, double beta) {
 		long M = Y.rows();
-		
+
 		// there might be a better way for this part
 		// TODO: make an upper/lower triangle matrix
 		// G is symmetric
@@ -261,30 +262,65 @@ public class CoherentPointDrift {
 			}
 		}
 	}
-	
+
+	// update sigma squared value
+	public double updateSigma2(Matrix X, Matrix Y, Matrix P, Matrix T) {
+		double res = 0;
+
+		double[] terms = new double[3];
+
+		int M = Y.rows();
+		int N = X.rows();
+		int D = X.columns();
+
+		terms[0] = (X.transpose()
+				.multiply(P.transpose().multiply(BasicVector.constant(M, 1)).toDiagonalMatrix().multiply(X)).trace());
+		terms[1] = (P.multiply(X).transpose().multiply(T).trace()) * (-2);
+		terms[2] = T.transpose().multiply(P.multiply(BasicVector.constant(N, 1)).toDiagonalMatrix().multiply(T))
+				.trace();
+
+		// sigma2 = 0; // ?
+		for (int i = 0; i < terms.length; ++i) {
+			res += terms[i];
+		}
+
+		double N_P = P.sum();
+		res /= (N_P * D);
+
+		return res;
+	}
+
+	// TODO:
+	public double calculateError(Matrix W, Matrix G, double lambda, double LOld) {
+		double res = 0;
+
+		return res;
+	}
+
 	// TODO: rewrite all assignments -> in place!
-	
+
 	public int runNonRigidRegistration(int flag) {
+		// TODO: update to use the functionality of la4j
 		readData(mX, mY);
 		// fill image with points that has to be detected
 		addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
-		
-		sigma2 = getSigma2(mX, mY);
-		calculateG(mY, mG);
 
-		// mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
+		sigma2 = getSigma2(mX, mY);
+		calculateG(mY, mG, beta);
+
 		mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 		addOverlay(imp, mT);
-	
+
 		int counter = 0;
 		while (counter++ < 30) {
-			// TODO: should be info for current iteration 
-			// # +  error 
+			// TODO: should be info for current iteration
+			// # + error
 			System.out.println("ITERATION #" + counter);
 
 			// TODO: OPTIMIZE
+			// Need paper on fast gauss transform
 			for (int m = 0; m < M; ++m) {
 				for (int n = 0; n < N; ++n) {
 					double val = (double) mX.getRow(n).subtract(mY.getRow(m).add(mG.getRow(m).multiply(mW))).norm();
@@ -303,7 +339,6 @@ public class CoherentPointDrift {
 				}
 			}
 
-			// BasicVector ones = BasicVector.constant(N, 1)
 			Vector invP = mP.multiply(BasicVector.constant(N, 1));
 			// TODO: Rewrite function below
 			// use in build functions
@@ -315,37 +350,9 @@ public class CoherentPointDrift {
 						.solve((invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY).getColumn(d)));
 			}
 
-			double N_P = (double) mP.sum();
-			//mT = (Basic2DMatrix) mT.insert(mY.add(mG.multiply(mW)));
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
-			
-			// debugResult(mT, 0);
-			// if (true) return 0;
+			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-			// System.out.println("Np : " + N_P);
-
-			double[] terms = new double[3];
-
-			Vector tmpVec = mP.transpose().multiply(BasicVector.constant(M, 1));
-			tmpVec.update(INV2_FUNCTION);
-
-			terms[0] = (double) (mX.transpose()
-					.multiply(mP.transpose().multiply(BasicVector.constant(M, 1)).toDiagonalMatrix().multiply(mX))
-					.trace());
-			terms[1] = (double) (mP.multiply(mX).transpose().multiply(mT).trace()) * (-2);
-			terms[2] = (double) mT.transpose()
-					.multiply(mP.multiply(BasicVector.constant(N, 1)).toDiagonalMatrix().multiply(mT)).trace();
-
-			sigma2 = 0;
-			for (int i = 0; i < terms.length; ++i) {
-				sigma2 += terms[i];
-				// System.out.println(terms[i]);
-			}
-
-			sigma2 /= (N_P * D);
-			System.out.println(sigma2);
-
-			// if (true) return 0;
 			addOverlay(imp, mT);
 		}
 
@@ -360,13 +367,6 @@ public class CoherentPointDrift {
 	// matrix file name
 	// ugly function to read mx and mY from CSV
 	public void readCSV() {
-
-		// int N = 112;
-		// int M = 133;
-		// int D = 2;
-		// mX = new Basic2DMatrix(N, D);
-		// mY = new Basic2DMatrix(M, D);
-
 		CSVReader reader = null;
 		String[] nextLine;
 
@@ -445,7 +445,21 @@ public class CoherentPointDrift {
 
 	public static void main(String[] args) {
 		new ImageJ();
-		new CoherentPointDrift().runNonRigidRegistration(0);
+
+		double w = 0.1;
+		double beta = 2;
+		double lambda = 3;
+
+		final Img<FloatType> img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
+
+		// read data first
+		// TODO: reading here
+		int D = 2; // dimensionality of the point set
+		int N = 133; // # of points in the first point set
+		int M = 112; // # of points in the second point set
+
+		// pass it as arguments
+		new CoherentPointDrift(img, N, M, D, w, beta, lambda).runNonRigidRegistration(0);
 		// new CoherentPointDrift().readCSV();
 	}
 }
