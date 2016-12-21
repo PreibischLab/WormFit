@@ -297,6 +297,29 @@ public class CoherentPointDrift {
 		return res;
 	}
 
+	public void calculateP(Matrix X, Matrix Y, Matrix P, Matrix W, Matrix G, double w_, double sigmaSq){
+		long M = Y.rows();
+		long N = X.rows();
+		long D = X.columns();
+		
+		for (int m = 0; m < M; ++m) {
+			for (int n = 0; n < N; ++n) {
+				double val = X.getRow(n).subtract(Y.getRow(m).add(G.getRow(m).multiply(W))).norm();
+				val *= -val / (2 * sigmaSq);
+				val = Math.exp(val);
+
+				double denom = 0;
+				for (int k = 0; k < M; ++k) {
+					double tmp = X.getRow(n).subtract(Y.getRow(k).add(G.getRow(k).multiply(W))).norm();
+					tmp *= -tmp / (2 * sigmaSq);
+					denom += Math.exp(tmp);
+				}
+				denom += w_ / (1 - w_) * Math.pow(2 * Math.PI * sigmaSq, D / 2) * M / N;
+				P.set(m, n, val / denom);
+			}
+		}
+	}
+	
 	// TODO: rewrite all assignments -> in place!
 
 	public int runNonRigidRegistration(int flag) {
@@ -318,27 +341,8 @@ public class CoherentPointDrift {
 			// TODO: should be info for current iteration
 			// # + error
 			System.out.println("ITERATION #" + counter);
-
-			// TODO: OPTIMIZE
-			// Need paper on fast gauss transform
-			for (int m = 0; m < M; ++m) {
-				for (int n = 0; n < N; ++n) {
-					double val = (double) mX.getRow(n).subtract(mY.getRow(m).add(mG.getRow(m).multiply(mW))).norm();
-					val *= -val / (2 * sigma2);
-					val = (double) Math.exp(val);
-
-					// TODO: is it possible to move this part out of the loop
-					double denom = 0;
-					for (int k = 0; k < M; ++k) {
-						double tmp = (double) mX.getRow(n).subtract(mY.getRow(k).add(mG.getRow(k).multiply(mW))).norm();
-						tmp *= -tmp / (2 * sigma2);
-						denom += Math.exp(tmp);
-					}
-					denom += w / (1 - w) * Math.pow(2 * Math.PI * sigma2, D / 2) * M / N;
-					mP.set(m, n, val / denom);
-				}
-			}
-
+			calculateP(mX, mY, mP, mW, mG, w, sigma2);
+		
 			Vector invP = mP.multiply(BasicVector.constant(N, 1));
 			// TODO: Rewrite function below
 			// use in build functions
@@ -349,7 +353,7 @@ public class CoherentPointDrift {
 				mW.setColumn(d, new LeastSquaresSolver(mG.add(invP.toDiagonalMatrix().multiply(sigma2 * lambda)))
 						.solve((invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY).getColumn(d)));
 			}
-
+			
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
