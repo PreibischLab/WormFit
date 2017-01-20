@@ -28,7 +28,7 @@ import util.ImgLib2Util;
 public class CentralCurveDetection {
 
 	private static final boolean showImage = true;
-	private static final boolean inProgress = true;
+	private static final boolean inProgress = false;
 
 	// detects the start and end points
 	public static <T extends RealType<T>, U extends RealType<U>> void detectEnds(PointSampleList<T> endPoints, PointSampleList<U> wormOutline, Img <T> notDst, T intensity){

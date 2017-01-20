@@ -1,41 +1,30 @@
 package coherent.point.drift;
 
 import java.awt.Color;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
 import org.la4j.LinearAlgebra;
-import org.la4j.Matrices;
 import org.la4j.Matrix;
 import org.la4j.Vector;
 import org.la4j.Vectors;
-import org.la4j.linear.GaussianSolver;
 import org.la4j.linear.LeastSquaresSolver;
 import org.la4j.matrix.dense.Basic2DMatrix;
-import org.la4j.operation.MatrixVectorOperation;
-import org.la4j.vector.VectorFactory;
 import org.la4j.vector.dense.BasicVector;
-import org.la4j.vector.functor.VectorAccumulator;
 import org.la4j.vector.functor.VectorFunction;
 
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.OvalRoi;
 import ij.gui.Overlay;
-import imglib.ops.operator.binary.Multiply;
 import mpicbg.imglib.util.Util;
-import mpicbg.imglib.wrapper.ImgLib2;
-import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
-import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 import test.TestGauss3d;
-import util.ImgLib2Util;
 import util.opencsv.CSVReader;
 import util.opencsv.CSVWriter;
 
@@ -52,38 +41,34 @@ public class CoherentPointDrift {
 	double sigma2; // TODO: 2 for squared
 
 	// parameters
-	double w; // amount of noise [0, 1]
-	double beta; // Briefly speaking, parameter defines the model of the
-	// smoothness regularizer (width of smoothing Gaussian
-	// filter in (20)).
-	double lambda; // Parameter represents the trade-off between the goodness of
-	// maximum likelihood fit and regularization.
+	final double w; 	// amount of noise [0, 1]
+	final double beta;  // Briefly speaking, parameter defines the model of the smoothness regularizer (width of smoothing Gaussian filter).
+	final double lambda; // trade-off between the goodness of maximum likelihood fit and regularization.
 
 	// TODO: convert stuff to the HPC
 	final Matrix mX; // N D
 	final Matrix mY; // M D
-	final Matrix mI; //
 	final Matrix mW; // M D
 	final Matrix mG; // M M
 	final Matrix mP; // M N
-
 	final Matrix mT; // M D transformation matrix
 
-	// straight to the non-rigid registration
-
-	// these guys are necessary for proper coordinates adjustment
+	// these guys are necessary for proper visualization
 	double[] translate;
 	double[] scale;
 	double[] sigma;
+	
+	final int maxIteration;
 
 	// constructor
-	public CoherentPointDrift(Img<FloatType> img, int N, int M, int D, double w, double beta, double lambda) {
-
+	public CoherentPointDrift(Img<FloatType> img, int N, int M, int D, double w, double beta, double lambda, int maxIteration) {
 		this.img = img;
 
 		this.w = w;
 		this.beta = beta;
 		this.lambda = lambda;
+		
+		this.maxIteration = maxIteration;
 
 		this.D = D; // dimensionality of the point set
 		this.N = N; // # of points in the first point set
@@ -91,16 +76,13 @@ public class CoherentPointDrift {
 
 		mX = new Basic2DMatrix(N, D);
 		mY = new Basic2DMatrix(M, D);
-		mI = new Basic2DMatrix(N, D); // TODO: ??
 		mW = new Basic2DMatrix(M, D);
-		mG = new Basic2DMatrix(M, M);
-		mP = new Basic2DMatrix(M, N);
-
+		mG = new Basic2DMatrix(M, M); // TODO: Bottleneck
+		mP = new Basic2DMatrix(M, N); // TODO: Bottleneck
 		mT = new Basic2DMatrix(M, D);
 
 		mW.setAll(0);
-		// settings for ouput image
-		// these guys are necessary for proper coordinates adjustment
+
 		// TODO: make this things calculated automatically
 		translate = new double[] { 250, 250 };
 		scale = new double[] { 150, 150 };
@@ -110,7 +92,7 @@ public class CoherentPointDrift {
 	/**
 	 * Inverts each element of vector (1/value).
 	 */
-	public static final VectorFunction INV2_FUNCTION = new VectorFunction() {
+	public static final VectorFunction INVERT_FUNCTION = new VectorFunction() {
 		@Override
 		public double evaluate(int i, double value) {
 			double eps = 0.000000001;
@@ -215,7 +197,7 @@ public class CoherentPointDrift {
 
 		scaleVal /= (M.rows());
 		scaleVal = Math.sqrt(scaleVal);
-		System.out.println(scaleVal);
+		// System.out.println(scaleVal);
 
 		for (int i = 0; i < M.rows(); ++i) {
 			for (int d = 0; d < D; ++d) {
@@ -291,37 +273,57 @@ public class CoherentPointDrift {
 	}
 
 	// TODO:
-	public double calculateError(Matrix W, Matrix G, double lambda, double LOld) {
+	public double calculateError(Matrix W, Matrix G, double w, double LOld) {
 		double res = 0;
 
 		return res;
 	}
 
-	public void calculateP(Matrix X, Matrix Y, Matrix P, Matrix W, Matrix G, double w_, double sigmaSq){
+	public double calculateP(Matrix X, Matrix Y, Matrix P, Matrix W, Matrix G, double w_, double sigmaSq){
 		long M = Y.rows();
 		long N = X.rows();
 		long D = X.columns();
 		
-		for (int m = 0; m < M; ++m) {
-			for (int n = 0; n < N; ++n) {
+		double error = 0;
+		
+		for (int n = 0; n < N; ++n) {
+			
+			// double sp = 0;
+			
+			for (int m = 0; m < M; ++m) {
 				double val = X.getRow(n).subtract(Y.getRow(m).add(G.getRow(m).multiply(W))).norm();
 				val *= -val / (2 * sigmaSq);
 				val = Math.exp(val);
 
+				// sp += val;
+				
 				double denom = 0;
 				for (int k = 0; k < M; ++k) {
 					double tmp = X.getRow(n).subtract(Y.getRow(k).add(G.getRow(k).multiply(W))).norm();
 					tmp *= -tmp / (2 * sigmaSq);
 					denom += Math.exp(tmp);
 				}
-				denom += w_ / (1 - w_) * Math.pow(2 * Math.PI * sigmaSq, D / 2) * M / N;
+				denom += w_ / (1 - w_) * Math.pow(2 * Math.PI * sigmaSq, D / 2.0) * M / N;
 				P.set(m, n, val / denom);
 			}
+			
+			// sp += w*(M*Math.pow(-2.0 * sigma2 * Math.PI, D / 2.0))/((1 - w)*N);
+			
+			// error += Math.log(sp);
 		}
+		
+		// error += D*N*Math.log(sigma2)/2; 
+		return error;
 	}
 	
 	// TODO: rewrite all assignments -> in place!
 
+	public void printLog(int idx, double sigma, double error){
+		System.out.println("ITERATION #" + idx + ":");
+		System.out.println("Sigma squared: " + String.format(java.util.Locale.US, "%.2e", sigma2));
+		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
+	}
+	
 	public int runNonRigidRegistration(int flag) {
 		// TODO: update to use the functionality of la4j
 		readData(mX, mY);
@@ -335,23 +337,30 @@ public class CoherentPointDrift {
 
 		mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 		addOverlay(imp, mT);
-
-		int counter = 0;
-		while (counter++ < 30) {
-			// TODO: should be info for current iteration
-			// # + error
-			System.out.println("ITERATION #" + counter);
-			calculateP(mX, mY, mP, mW, mG, w, sigma2);
 		
-			Vector invP = mP.multiply(BasicVector.constant(N, 1));
-			// TODO: Rewrite function below
-			// use in build functions
-			invP.update(INV2_FUNCTION); // you will reuse this value !!
+		double error = 1;
+		double errorOld = 1;
 
+		int iter = 0;
+		// TODO: add error estimator here
+		while (iter++ < maxIteration*2 && sigma2 > 1e-10) {
+			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
+			
+			errorOld = error;
+			error = calculateP(mX, mY, mP, mW, mG, w, sigma2);
+			error += lambda/2*(mW.transpose().multiply(mG).multiply(mW)).trace();
+		
+			
+			
+			Vector invP = mP.multiply(BasicVector.constant(N, 1));
+			invP.update(INVERT_FUNCTION); 
+			
+			Matrix A = mG.add(invP.toDiagonalMatrix().multiply(sigma2 * lambda));
+			Matrix b = (invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY);
+			
 			// using least square method here
 			for (int d = 0; d < D; ++d) {
-				mW.setColumn(d, new LeastSquaresSolver(mG.add(invP.toDiagonalMatrix().multiply(sigma2 * lambda)))
-						.solve((invP.toDiagonalMatrix().multiply(mP).multiply(mX)).subtract(mY).getColumn(d)));
+				mW.setColumn(d, new LeastSquaresSolver(A).solve(b.getColumn(d)));
 			}
 			
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
@@ -363,8 +372,8 @@ public class CoherentPointDrift {
 		// writeCSV();
 
 		// T is the transformation you are looking for
-		System.out.println("hello");
-		return 1;
+		System.out.println("Done");
+		return 0;
 	}
 
 	// add parameters
@@ -375,7 +384,7 @@ public class CoherentPointDrift {
 		String[] nextLine;
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-folded.csv"), '\t');
+			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-straight.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -392,7 +401,7 @@ public class CoherentPointDrift {
 		}
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-straight.csv"), '\t');
+			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-folded.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -453,17 +462,18 @@ public class CoherentPointDrift {
 		double w = 0.1;
 		double beta = 2;
 		double lambda = 3;
+		int maxIteration = 30;
 
 		final Img<FloatType> img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
 
 		// read data first
 		// TODO: reading here
 		int D = 2; // dimensionality of the point set
-		int N = 133; // # of points in the first point set
-		int M = 112; // # of points in the second point set
+		int M = 133; // # of points in the first point set
+		int N = 112; // # of points in the second point set
 
 		// pass it as arguments
-		new CoherentPointDrift(img, N, M, D, w, beta, lambda).runNonRigidRegistration(0);
+		new CoherentPointDrift(img, N, M, D, w, beta, lambda, maxIteration).runNonRigidRegistration(0);
 		// new CoherentPointDrift().readCSV();
 	}
 }
