@@ -32,12 +32,12 @@ public class ApacheCPD {
 
 	// TODO: convert stuff to the HPC
 	// how to make this final
-	RealMatrix mX; // N D
-	RealMatrix mY; // M D
-	RealMatrix mW; // M D
-	RealMatrix mG; // M M
-	RealMatrix mP; // M N
-	RealMatrix mT; // M D transformation matrix
+	final RealMatrix mX; // N D
+	final RealMatrix mY; // M D
+	final RealMatrix mW; // M D
+	final RealMatrix mG; // M M
+	final RealMatrix mP; // M N
+	final RealMatrix mT; // M D transformation matrix
 
 	// these guys are necessary for proper visualization
 	double[] translate;
@@ -80,12 +80,12 @@ public class ApacheCPD {
 		this.N = N; // # of points in the first point set
 		this.M = M; // # of points in the second point set
 
-		mX.createMatrix(N, D);
-		mY.createMatrix(M, D);
-		mW.createMatrix(M, D);
-		mG.createMatrix(M, M);
-		mP.createMatrix(M, N);
-		mT.createMatrix(M, D);
+		mX = MatrixUtils.createRealMatrix(N, D);
+		mY = MatrixUtils.createRealMatrix(M, D);
+		mW = MatrixUtils.createRealMatrix(M, D);
+		mG = MatrixUtils.createRealMatrix(M, M);
+		mP = MatrixUtils.createRealMatrix(M, N);
+		mT = MatrixUtils.createRealMatrix(M, D);
 
 		// TODO: if nothing is working set matrix mW to 0 explicitly
 		// TODO: make this things calculated automatically
@@ -98,72 +98,51 @@ public class ApacheCPD {
 	protected void normalize(RealMatrix M){
 		int numColumns = M.getColumnDimension();
 		int numRows = M.getRowDimension();
-
-		// System.out.println("rows: " + numRows + " cols: " + numColumns);
-
+		
 		double [] sumOverColumns = new double [numColumns];
 		// zero mean
-//		for (int d = 0; d < numColumns; ++d){
-//			sumOverColumns[d]= 0;
-//			for(int j = 0; j < numRows; ++j){			
-//				sumOverColumns[d] += M.getEntry(j, d);
-//			}
-//			sumOverColumns[d] /= numRows;
-//		}
-		
-		for (int d = 0; d < numColumns; ++d){
+		for (int d = 0; d < numColumns; ++d)
 			sumOverColumns[d]= 0;
-		}
 		
 		ColumnSumVisitor columnSumVisitor = new ColumnSumVisitor(sumOverColumns);
 		columnSumVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+		M.walkInOptimizedOrder(columnSumVisitor);
 		columnSumVisitor.end();
 		
-		for(int d = 0; d < numColumns; ++d){			
+		for(int d = 0; d < numColumns; ++d)		
 			sumOverColumns[d] /= numRows;
-		}
+	
+		ColumnSubtractValueVisitor columnSubtractValueVisitor = new ColumnSubtractValueVisitor(sumOverColumns);
+		columnSubtractValueVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+		M.walkInOptimizedOrder(columnSubtractValueVisitor);
+		columnSubtractValueVisitor.end();
 		
-
-		// TODO: rewrite using visitors
-		for (int d = 0; d < numColumns; ++d ){
-			M.setColumnVector(d, M.getColumnVector(d).mapSubtract(sumOverColumns[d]));		
-		}
-
-		printMatrix(M, numColumns, numRows);
-
-		// DEBUG: 0 mean is fine 
-
 		// std = 1
-		// TODO: std is calculated in a wroong way
-		double scaleValue = 0; 
-		for (int  i = 0; i < numRows; ++i){
-			scaleValue += (M.getRowVector(i).ebeMultiply(M.getRowVector(i))).getL1Norm(); // squared length of i'th vector 
-		}
-
+		MatrixSumSquaredElementsVisitor matrixSumSquaredElementsVisitor = new MatrixSumSquaredElementsVisitor();
+		matrixSumSquaredElementsVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+		M.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
+		double scaleValue = matrixSumSquaredElementsVisitor.end();
+		
 		scaleValue /= numRows;
 		scaleValue = Math.sqrt(scaleValue);
  		
-		
 		MatrixVisitor matrixVisitor = new MatrixVisitor(scaleValue);
 		matrixVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
 		M.walkInOptimizedOrder(matrixVisitor);
-
 		matrixVisitor.end();
-		printMatrix(M, 1, numRows);
 
-		double res = 0;
-		for (int i = 0; i < numRows; ++i){
-			for (int d = 0; d < numColumns; ++d)
-				res += M.getColumn(d)[i]*M.getColumn(d)[i];
-		} 
-
-		System.out.println(res/numRows);
-
+		// System.out.println("If this factor is not 1 then normalization is wrong! " + res/numRows);
 	}
 
-	// debug 
+	// calculates sigma squared
+	protected void getSigma2(){
+		
+	}
+	
+	//-- Move all visitors to the new class file --//
+	
+	// DEBUG: Print out the matrix 
 	public void printMatrix(RealMatrix M, int ColumnDimension, int RowDimension){
-
 		for (int j = 0; j < RowDimension; j++ ){
 			for (int i = 0; i < ColumnDimension; i++ ){
 				System.out.print(M.getEntry(j, i) + " ");
@@ -219,6 +198,52 @@ public class ApacheCPD {
 		}
 	}
 
+	// this is a matrix visitor that subtracts array values from corresponding columns
+	public class ColumnSubtractValueVisitor implements RealMatrixChangingVisitor{
+		final double [] values; 
+
+		public ColumnSubtractValueVisitor(double[] values){
+			this.values = values;
+		}
+
+		public void start (int rows, int columns,
+				int startRow, int endRow, int startColumn, int endColumn){
+
+		}
+
+		public double visit(int row, int col, double val){
+			return val - values[col];
+		}
+
+		public double end(){
+			return 0; // 0 for everything is fine 
+		}
+	}
+	
+	// this is a matrix visitor that returns the squared sum over columns
+	public class MatrixSumSquaredElementsVisitor implements RealMatrixPreservingVisitor{
+			double sum; 
+
+			public MatrixSumSquaredElementsVisitor(){
+				this.sum = 0;
+			}
+
+			public void start (int rows, int columns,
+					int startRow, int endRow, int startColumn, int endColumn){
+
+			}
+
+			public void visit(int row, int col, double val){
+				sum += val*val;
+				
+			}
+
+			public double end(){
+				return sum; // 0 for everything is fine 
+			}
+		}
+	
+	
 	public void test(){
 		RealMatrix matrix = MatrixUtils.createRealMatrix(10, 3);
 
