@@ -1,5 +1,8 @@
 package coherent.point.drift;
 
+import org.apache.commons.math3.geometry.euclidean.oned.Vector1D;
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.DiagonalMatrix;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealMatrixChangingVisitor;
@@ -7,9 +10,10 @@ import org.apache.commons.math3.linear.RealMatrixPreservingVisitor;
 import org.apache.commons.math3.linear.RealVector;
 import org.la4j.Matrix;
 import org.la4j.matrix.dense.Basic2DMatrix;
+import org.la4j.operation.VectorVectorOperation;
 
-import coherent.point.drift.MyVisitors.MatrixVisitor;
 import ij.ImagePlus;
+import mdbtools.dbengine.functions.Upper;
 import net.imglib2.img.Img;
 import net.imglib2.type.numeric.real.FloatType;
 
@@ -118,7 +122,7 @@ public class ApacheCPD {
 		columnSubtractValueVisitor.end();
 		
 		// std = 1
-		MatrixSumSquaredElementsVisitor matrixSumSquaredElementsVisitor = new MatrixSumSquaredElementsVisitor();
+		MatrixSumElementsVisitor matrixSumSquaredElementsVisitor = new MatrixSumElementsVisitor(1);
 		matrixSumSquaredElementsVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
 		M.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
 		double scaleValue = matrixSumSquaredElementsVisitor.end();
@@ -135,8 +139,95 @@ public class ApacheCPD {
 	}
 
 	// calculates sigma squared
-	protected void getSigma2(){
+	protected double getSigma2(RealMatrix X, RealMatrix Y){
+		int M = Y.getRowDimension();
+		int N = X.getRowDimension();
 		
+		int D = X.getColumnDimension(); 
+		
+		
+		double [] sumMX = new double[D];
+		double [] sumMY = new double[D];
+		
+		for (int d =0; d < D; d++){
+			sumMX[d] = 0;
+			sumMY[d] = 0;
+		}
+		
+		ColumnSumVisitor columnSumVisitorMX= new ColumnSumVisitor(sumMX);
+		columnSumVisitorMX.start(N, D, 0, N - 1, 0, D - 1);
+		X.walkInRowOrder(columnSumVisitorMX);
+		columnSumVisitorMX.end();
+		
+		ColumnSumVisitor columnSumVisitorMY = new ColumnSumVisitor(sumMY);
+		columnSumVisitorMY.start(M, D, 0, M - 1, 0, D - 1);
+		Y.walkInRowOrder(columnSumVisitorMY);
+		columnSumVisitorMY.end();
+		
+		double sum = 0;
+		for (int d  = 0; d < D; d++)
+			sum += sumMX[d]*sumMY[d];
+		
+		double res = (double) (M * X.transpose().multiply(X).getTrace() + N * Y.transpose().multiply(Y).getTrace() - 2*sum) / (M*N*D);
+		
+		return res; 
+		
+	}
+	
+	// calculates G matrix 
+	protected void calculateG(RealMatrix Y, RealMatrix G, double beta){
+		long M = Y.getRowDimension();
+		
+		// TODO: G is symmetric any better way to store it here 
+		for (int i = 0; i < M; i++){
+			for (int j = 0; j < M; j++){
+				double val = (double) Y.getRowVector(i).subtract(Y.getRowVector(j)).getNorm(); // TODO: might be simplified ?!
+				val *= -val/(2*beta*beta);
+				G.setEntry(i, j, Math.exp(val));
+			}	
+		}
+	}
+
+	// upadate sigma squared value 
+	protected double updateSigma2(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix T){
+		double res = 0; 
+		 
+		double[] terms = new double [3];
+		
+		int M = Y.getRowDimension();
+		int N = X.getRowDimension();
+		int D = X.getColumnDimension();
+		
+		
+		RealVector bigOneM = new ArrayRealVector(M, 1);
+		RealVector bigOneN = new ArrayRealVector(N, 1);
+		
+		
+		terms[0] = (X.transpose().preMultiply(new DiagonalMatrix(P.transpose().preMultiply(bigOneM).toArray()))).multiply(X).getTrace();
+		terms[1] = ((P.multiply(X)).transpose().multiply(T)).getTrace()*(-2);
+		terms[2] = T.transpose().preMultiply(new DiagonalMatrix(P.preMultiply(bigOneN).toArray()).multiply(T)).getTrace();
+		
+				
+		for (int j = 0; j < terms.length; ++j)
+				res += terms[j];
+		
+		double N_P = 0; 
+		MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
+		matrixSumElementsVisitor.start(M, N, 0, M - 1, 0, N - 1);
+		P.walkInOptimizedOrder(matrixSumElementsVisitor);
+		N_P = matrixSumElementsVisitor.end();
+				
+		res /= (N_P*D); 
+		
+		return res;
+		
+	}
+	
+	
+	protected double calculateP(){
+		double error = 0; 
+		
+		return error; 
 	}
 	
 	//-- Move all visitors to the new class file --//
@@ -221,20 +312,21 @@ public class ApacheCPD {
 	}
 	
 	// this is a matrix visitor that returns the squared sum over columns
-	public class MatrixSumSquaredElementsVisitor implements RealMatrixPreservingVisitor{
+	public class MatrixSumElementsVisitor implements RealMatrixPreservingVisitor{
 			double sum; 
+			double flag; // specifies if one want to sum squares or values
 
-			public MatrixSumSquaredElementsVisitor(){
+			public MatrixSumElementsVisitor(int flag){
 				this.sum = 0;
+				this.flag = flag;
 			}
 
 			public void start (int rows, int columns,
 					int startRow, int endRow, int startColumn, int endColumn){
-
 			}
 
 			public void visit(int row, int col, double val){
-				sum += val*val;
+				sum += val* (flag == 0 ? 1 : val);
 				
 			}
 
