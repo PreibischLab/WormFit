@@ -366,7 +366,7 @@ public class CoherentPointDrift {
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-			// addOverlay(imp, mT);
+		//ddOverlay(imp, mT);
 		}
 
 		// writeCSV();

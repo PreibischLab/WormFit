@@ -321,6 +321,61 @@ public class ApacheCPD {
 		return 0; // TODO: is 0 here for the normal execution 
 	}
 
+	public void runAffineRegistration(int flag){
+		RealMatrix mB = MatrixUtils.createRealIdentityMatrix(D);
+ 		// double t = 0; // some other parameter 
+		
+		RealVector t = MatrixUtils.createRealVector(new double[D]);
+		t.set(0);
+		
+		
+		sigma2 = getSigma2(mX, mY); // TODO: this looks fine but who knows
+		
+		double error= 1; 
+		double errorOld = 1;
+		
+		int iter = 0;
+		while (iter++ < maxIteration && sigma2 > 1e-10){
+			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
+			
+			// TODO: implement calculation of P
+			// computation of P might be generalized
+			// computeP(...)
+			
+			double N_P = 0; 
+			MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
+			matrixSumElementsVisitor.start(M, N, 0, M - 1, 0, N - 1);
+			mP.walkInOptimizedOrder(matrixSumElementsVisitor);
+			N_P = matrixSumElementsVisitor.end();
+			
+			RealVector muX = (mX.transpose().multiply(mP.transpose()).operate(new ArrayRealVector(M, 1))).mapDivide(N_P);
+			RealVector muY = (mY.transpose().multiply(mP).operate(new ArrayRealVector(N, 1))).mapDivide(N_P);
+			
+			// zero mean
+			RealMatrix meanX = mX.subtract(new ArrayRealVector(M, 1).outerProduct(muX));
+			RealMatrix meanY = mY.subtract(new ArrayRealVector(N, 1).outerProduct(muY));
+			
+			// TODO: use set instead
+			// check if this freaking line is correct at all 
+			mB = (meanX.transpose().multiply(mP.transpose().multiply(meanY))).multiply(MatrixUtils.inverse(meanY.transpose().multiply((new DiagonalMatrix(mP.transpose().operate(new ArrayRealVector(M, 1)).toArray()).multiply(meanY)))));
+			
+			t.setSubVector(0, muX.subtract(mB.operate(muY)));
+			
+			// twoo terms for the sum
+			double [] terms = new double [2];
+			
+			terms[0] = meanX.transpose().multiply(new DiagonalMatrix(mP.transpose().operate(new ArrayRealVector(N, 1)).toArray()).multiply(meanX)).getTrace();
+			terms[1] = meanX.transpose().multiply(mP.transpose().multiply(meanY).multiply(mB.transpose())).getTrace();
+			
+			sigma2 = (terms[0] - terms[1])/(N_P*D);
+			
+		}
+		
+		
+		mT.setSubMatrix((mY.multiply(mB.transpose())).add(new ArrayRealVector(M, 1).outerProduct(t)).getData(), 0, 0);
+		
+	}
+	
 	//-- reading part move to another class --// 
 	public void readData(RealMatrix X, RealMatrix Y) {
 		readCSV(); // reading is fine
@@ -338,7 +393,7 @@ public class ApacheCPD {
 		String[] nextLine;
 
 		try {
-			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-straight.csv"), '\t');
+			reader = new CSVReader(new FileReader("woo ella worm-straight.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -502,6 +557,7 @@ public class ApacheCPD {
 			return 0; // 0 for everything is fine 
 		}
 	}
+	
 
 	// this is a matrix visitor that returns the squared sum over columns
 	public class MatrixSumElementsVisitor implements RealMatrixPreservingVisitor{
