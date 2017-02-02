@@ -328,7 +328,7 @@ public class CoherentPointDrift {
 		// TODO: update to use the functionality of la4j
 		readData(mX, mY);
 		// fill image with points that has to be detected
-		addPoints(img);
+		// addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
 
@@ -366,7 +366,7 @@ public class CoherentPointDrift {
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-			addOverlay(imp, mT);
+			// addOverlay(imp, mT);
 		}
 
 		// writeCSV();
@@ -384,7 +384,7 @@ public class CoherentPointDrift {
 		String[] nextLine;
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-straight.csv"), '\t');
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-straight.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -401,7 +401,7 @@ public class CoherentPointDrift {
 		}
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-folded.csv"), '\t');
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-folded.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}

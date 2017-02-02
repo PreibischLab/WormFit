@@ -1,21 +1,30 @@
 package coherent.point.drift;
 
-import org.apache.commons.math3.geometry.euclidean.oned.Vector1D;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+
+import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.DecompositionSolver;
 import org.apache.commons.math3.linear.DiagonalMatrix;
 import org.apache.commons.math3.linear.MatrixUtils;
+import org.apache.commons.math3.linear.QRDecomposition;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealMatrixChangingVisitor;
 import org.apache.commons.math3.linear.RealMatrixPreservingVisitor;
 import org.apache.commons.math3.linear.RealVector;
-import org.la4j.Matrix;
-import org.la4j.matrix.dense.Basic2DMatrix;
-import org.la4j.operation.VectorVectorOperation;
 
+
+import ij.ImageJ;
 import ij.ImagePlus;
-import mdbtools.dbengine.functions.Upper;
 import net.imglib2.img.Img;
+import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
+import util.opencsv.CSVReader;
+import util.opencsv.CSVWriter;
 
 public class ApacheCPD {
 
@@ -130,10 +139,13 @@ public class ApacheCPD {
 		scaleValue /= numRows;
 		scaleValue = Math.sqrt(scaleValue);
 
+		// TODO: Is not this the shortcut for the stuff below? -- M.scalarMultiply(1./scaleValue);
 		MatrixVisitor matrixVisitor = new MatrixVisitor(scaleValue);
 		matrixVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
 		M.walkInOptimizedOrder(matrixVisitor);
 		matrixVisitor.end();
+
+
 
 		// System.out.println("If this factor is not 1 then normalization is wrong! " + res/numRows);
 	}
@@ -249,6 +261,166 @@ public class ApacheCPD {
 		return error; 
 	}
 
+
+	public void printLog(int idx, double sigma, double error){
+		System.out.println("ITERATION #" + idx + ":");
+		System.out.println("Sigma squared: " + String.format(java.util.Locale.US, "%.2e", sigma)); // TODO: was sigma2 inititally
+		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
+	}
+
+	public int runNonRigidRegistration(int flag){
+		readData(mX, mY);
+
+		// TODO: 
+		// addPoints(img);
+		// imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
+		// imp.show();
+
+		sigma2 = getSigma2(mX, mY);
+		calculateG(mY, mG, beta);
+		// TODO: FIXME: this is dumb copying to keep everything final 
+		// is mT = ... faster ?
+		mT.setSubMatrix(mY.add(mG.multiply(mW)).getData(), 0, 0); 
+		// TODO: 
+		// addOverlay(imp, mT);
+		double error= 1; 
+		double errorOld = 1;
+
+		int iter = 0; 
+		
+		// TODO: add error estimator here 
+		while (iter++ < maxIteration && sigma2 > 1e-10){
+			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
+
+			errorOld = error;
+			error = calculateP(mX, mY, mP, mW, mG, w, sigma2);
+			error += lambda/2*(mW.transpose().multiply(mG).multiply(mW)).getTrace();
+
+			RealVector bigOneN = new ArrayRealVector(N, 1);
+
+			RealVector invP = mP.operate(bigOneN);
+			invP.mapToSelf(new ElementwiseInverse());
+
+			System.out.println("goes to this part");
+			
+			RealMatrix A = mG.add((new DiagonalMatrix(invP.toArray())).scalarMultiply(sigma2 * lambda));
+			RealMatrix b = ((new DiagonalMatrix(invP.toArray())).multiply(mP).multiply(mX)).subtract(mY);
+
+			DecompositionSolver solver = new QRDecomposition(A).getSolver();
+			mW.setSubMatrix(solver.solve(b).getData(), 0, 0) ;
+
+			mT.setSubMatrix(mY.add(mG.multiply(mW)).getData(), 0, 0); 
+			sigma2 = updateSigma2(mX, mY, mP, mT);
+
+			// addOverlay(imp, mT);
+
+
+		}
+
+		System.out.println("Done");
+		return 0; // TODO: is 0 here for the normal execution 
+	}
+
+	//-- reading part move to another class --// 
+	public void readData(RealMatrix X, RealMatrix Y) {
+		readCSV(); // reading is fine
+		normalize(X);
+		normalize(Y);
+	}
+
+	// add parameters
+	// matrix file name
+	// ugly function to read mx and mY from CSV
+
+	// TODO: move to the apache math3 from la4j
+	public void readCSV() {
+		CSVReader reader = null;
+		String[] nextLine;
+
+		try {
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-straight.csv"), '\t');
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			int i = 0;
+			while ((nextLine = reader.readNext()) != null) {
+				mX.setEntry(i, 0, Double.parseDouble(nextLine[0]));
+				mX.setEntry(i, 1, Double.parseDouble(nextLine[1]));
+				i++;
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-folded.csv"), '\t');
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		try {
+			int i = 0;
+			while ((nextLine = reader.readNext()) != null) {
+				mY.setEntry(i, 0, Double.parseDouble(nextLine[0]));
+				mY.setEntry(i, 1, Double.parseDouble(nextLine[1]));
+				i++;
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	public void writeCSV() {
+		CSVWriter writer = null;
+		String[] nextLine;
+
+		try {
+			writer = new CSVWriter(new FileWriter("src/main/resources/xRes.csv"), '\t');
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		try {
+			for (int i = 0; i < N; ++i) {
+				nextLine = mX.getRow(i).toString().split(" ");
+				writer.writeNext(nextLine);
+			}
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			writer = new CSVWriter(new FileWriter("src/main/resources/yRes.csv"), '\t');
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		try {
+			for (int i = 0; i < N; ++i) {
+				nextLine = mY.getRow(i).toString().split(" ");
+				writer.writeNext(nextLine);
+			}
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+
+
+	//----------------------------------------//
+
+	private static class ElementwiseInverse implements UnivariateFunction {
+		public double value(double x) {
+			return 1.0/x;
+		}
+	}
+
+
 	//-- Move all visitors to the new class file --//
 
 	// DEBUG: Print out the matrix 
@@ -284,6 +456,7 @@ public class ApacheCPD {
 			return 0; // 0 for everything is fine 
 		}
 	}
+
 
 	// this is a matrix visitor that returns the sum over columns
 	public class ColumnSumVisitor implements RealMatrixPreservingVisitor{
@@ -367,9 +540,31 @@ public class ApacheCPD {
 		// M.setEntry(j, d, d + 1);
 		normalize(matrix);
 	}
+	
+	public void testRigid(){
+		new ImageJ();
+
+		double w = 0.1;
+		double beta = 2;
+		double lambda = 3;
+		int maxIteration = 30;
+
+		final Img<FloatType> img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
+
+		// read data first
+		// TODO: reading here
+		int D = 2; // dimensionality of the point set
+		int M = 133; // # of points in the first point set
+		int N = 112; // # of points in the second point set
+
+		// pass it as arguments
+		new ApacheCPD(img, N, M, D, w, beta, lambda, maxIteration).runNonRigidRegistration(0);
+		// new CoherentPointDrift().readCSV();
+	}
 
 	public static void main(String[] args) {
-		new ApacheCPD().test();
+		// new ApacheCPD().test();
+		new ApacheCPD().testRigid();
 	}
 
 }
