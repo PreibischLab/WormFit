@@ -24,7 +24,6 @@ import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
-import test.TestGauss3d;
 import util.opencsv.CSVReader;
 import util.opencsv.CSVWriter;
 
@@ -128,7 +127,7 @@ public class CoherentPointDrift {
 				location[d] = (mX.get(i, d) * scale[d] + translate[d]);
 			}
 			// TODO: Use function from klim.utils
-			TestGauss3d.addGaussian(img, location, sigma);
+			ApacheCPD.addGaussian(img, location, sigma);
 		}
 	}
 
@@ -366,7 +365,7 @@ public class CoherentPointDrift {
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-		//ddOverlay(imp, mT);
+		//addOverlay(imp, mT);
 		}
 
 		// writeCSV();

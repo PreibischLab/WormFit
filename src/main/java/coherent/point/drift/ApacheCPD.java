@@ -1,5 +1,6 @@
 package coherent.point.drift;
 
+import java.awt.Color;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -9,20 +10,30 @@ import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.DecompositionSolver;
 import org.apache.commons.math3.linear.DiagonalMatrix;
+import org.apache.commons.math3.linear.LUDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.QRDecomposition;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealMatrixChangingVisitor;
 import org.apache.commons.math3.linear.RealMatrixPreservingVisitor;
 import org.apache.commons.math3.linear.RealVector;
-
+import org.apache.commons.math3.linear.SingularValueDecomposition;
+import org.la4j.Matrix;
 
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.gui.OvalRoi;
+import ij.gui.Overlay;
+import mpicbg.imglib.util.Util;
+import net.imglib2.Cursor;
+import net.imglib2.IterableInterval;
+import net.imglib2.RandomAccessible;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.view.Views;
 import util.opencsv.CSVReader;
 import util.opencsv.CSVWriter;
 
@@ -271,18 +282,16 @@ public class ApacheCPD {
 	public int runNonRigidRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
 
-		// TODO: 
-		// addPoints(img);
-		// imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
-		// imp.show();
+		addPoints(img);
+		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
+		imp.show();
 
 		sigma2 = getSigma2(mX, mY);
 		calculateG(mY, mG, beta);
 		// TODO: FIXME: this is dumb copying to keep everything final 
 		// is mT = ... faster ?
 		mT.setSubMatrix(mY.add(mG.multiply(mW)).getData(), 0, 0); 
-		// TODO: 
-		// addOverlay(imp, mT);
+		addOverlay(imp, mT);
 		double error= 1; 
 		double errorOld = 1;
 
@@ -312,9 +321,7 @@ public class ApacheCPD {
 			mT.setSubMatrix(mY.add(mG.multiply(mW)).getData(), 0, 0); 
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-			// addOverlay(imp, mT);
-
-
+			addOverlay(imp, mT);
 		}
 
 		System.out.println("Done");
@@ -349,8 +356,12 @@ public class ApacheCPD {
 		return error; 
 	}
 
-	public void runAffineRegistration(int flag, String from, String to){
+	public int runAffineRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
+		
+		addPoints(img);
+		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
+		imp.show();
 		
 		RealMatrix mB = MatrixUtils.createRealIdentityMatrix(D);
 		// double t = 0; // some other parameter 
@@ -368,7 +379,7 @@ public class ApacheCPD {
 		while (iter++ < maxIteration && sigma2 > 1e-10){
 			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
 
-			calculatePAR(mX, mY, mP, mB, t, w, sigma2);
+			computePaffine(mX, mY, mP, mB, t, w, sigma2);
 
 			double N_P = 0; 
 			MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
@@ -396,13 +407,96 @@ public class ApacheCPD {
 			terms[1] = meanX.transpose().multiply(mP.transpose().multiply(meanY).multiply(mB.transpose())).getTrace();
 
 			sigma2 = (terms[0] - terms[1])/(N_P*D);
+			
+			// TODO: FIXME: line below is only to see the result
+			mT.setSubMatrix((mY.multiply(mB.transpose())).add(new ArrayRealVector(M, 1).outerProduct(t)).getData(), 0, 0);
+			addOverlay(imp, mT);
 
 		}
 
 		mT.setSubMatrix((mY.multiply(mB.transpose())).add(new ArrayRealVector(M, 1).outerProduct(t)).getData(), 0, 0);
 
+		return 0;
 	}
 
+	
+	public void computePrigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix R, double s, RealVector t, double w_, double sigmaSq){
+		calculatePAR(X, Y, P, R.scalarMultiply(s), t, w_, sigmaSq);
+	}
+	
+	public void computePaffine(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix B, RealVector t, double w_, double sigmaSq){
+		calculatePAR(X, Y, P, B, t, w_, sigmaSq);
+	}
+	
+	public int runRigidRegistration(int flag, String from, String to){
+		readData(mX, mY, from, to);
+		
+		addPoints(img);
+		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
+		imp.show();
+		
+		RealMatrix mR = MatrixUtils.createRealIdentityMatrix(D);
+	
+		RealVector t = MatrixUtils.createRealVector(new double[D]);
+		t.set(0);
+		double s = 1;
+		
+		sigma2 = getSigma2(mX, mY); // TODO: this looks fine but who knows
+
+		double error= 1; 
+		double errorOld = 1;
+
+		int iter = 0;
+		while (iter++ < maxIteration && sigma2 > 1e-10){
+			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
+
+			computePrigid(mX, mY, mP, mR, s, t, w, sigma2);
+
+			double N_P = 0; 
+			MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
+			matrixSumElementsVisitor.start(M, N, 0, M - 1, 0, N - 1);
+			mP.walkInOptimizedOrder(matrixSumElementsVisitor);
+			N_P = matrixSumElementsVisitor.end();
+
+			RealVector muX = (mX.transpose().multiply(mP.transpose()).operate(new ArrayRealVector(M, 1))).mapDivide(N_P);
+			RealVector muY = (mY.transpose().multiply(mP).operate(new ArrayRealVector(N, 1))).mapDivide(N_P);
+
+			// zero mean
+			RealMatrix meanX = mX.subtract(new ArrayRealVector(M, 1).outerProduct(muX));
+			RealMatrix meanY = mY.subtract(new ArrayRealVector(N, 1).outerProduct(muY));
+
+			
+			RealMatrix mA = meanX.transpose().multiply(mP.transpose().multiply(meanY));
+			SingularValueDecomposition SVDmA = new SingularValueDecomposition(mA);
+			
+			double[] identity = new double[D];
+			for(int d = 0; d < D - 1; d++)
+				identity[d] = 1;
+			identity[D - 1] = new LUDecomposition(SVDmA.getU().multiply(SVDmA.getV())).getDeterminant();
+					
+			mR.setSubMatrix(SVDmA.getU().multiply(new DiagonalMatrix(identity, false).multiply(SVDmA.getVT())).getData() , 0, 0);
+			
+			s = (mA.transpose().multiply(mR).getTrace()) / (meanY.transpose().multiply(new DiagonalMatrix( mP.transpose().operate(new ArrayRealVector(M, 1)).toArray()).multiply(meanY)).getTrace());
+			t.setSubVector(0, mR.operate(muY).mapMultiply(s));
+
+			// two terms for the sum
+			double [] terms = new double [2];
+
+			terms[0] = meanX.transpose().multiply(new DiagonalMatrix(mP.transpose().operate(new ArrayRealVector(N, 1)).toArray()).multiply(meanX)).getTrace();
+			terms[1] = s*(mA.transpose().multiply(mR)).getTrace(); 
+					
+			sigma2 = (terms[0] - terms[1])/(N_P*D);
+			
+			// TODO: FIXME: line below is only to see the result
+			mT.setSubMatrix(mY.multiply(mR.transpose()).scalarMultiply(s).add(new ArrayRealVector(M, 1).outerProduct(t) ).getData(), 0, 0);
+			addOverlay(imp, mT);
+
+		}
+
+		mT.setSubMatrix(mY.multiply(mR.transpose()).scalarMultiply(s).add(new ArrayRealVector(M, 1).outerProduct(t) ).getData(), 0, 0);
+		return 0;
+	}
+	
 	//-- reading part move to another class --// 
 	public void readData(RealMatrix X, RealMatrix Y, String from, String to) {
 		readCSV(from, to); // reading is fine
@@ -410,11 +504,7 @@ public class ApacheCPD {
 		normalize(Y);
 	}
 
-	// add parameters
-	// matrix file name
-	// ugly function to read mx and mY from CSV
-
-	// TODO: move to the apache math3 from la4j
+	// TODO: move intput and visual stuff to another class file
 	public void readCSV(String from, String to) {
 		CSVReader reader = null;
 		String[] nextLine;
@@ -492,8 +582,45 @@ public class ApacheCPD {
 
 	}
 
+	/**
+	 * Shows coordinates defined by A in the imp image
+	 * 
+	 */
+	public void addOverlay(ImagePlus imp, RealMatrix A) {
+		int numDimensions = A.getColumnDimension();
+		int numPoints = A.getRowDimension();
 
+		Overlay overlay = imp.getOverlay();
+		if (overlay == null) {
+			overlay = new Overlay();
+		}
+		overlay.clear();
 
+		double[] location = new double[numDimensions];
+		for (int i = 0; i < numPoints; ++i) {
+			for (int d = 0; d < numDimensions; ++d) {
+				location[d] = A.getEntry(i, d) * scale[d] + translate[d];
+			}
+			final OvalRoi or = new OvalRoi(location[0] - sigma[0], location[1] - sigma[0], Util.round(2 * sigma[0]),
+					Util.round(2 * sigma[1]));
+			or.setStrokeColor(Color.RED);
+			overlay.add(or);
+		}
+		imp.setOverlay(overlay);
+	}
+
+	// add points that has to be detected
+	public void addPoints(Img<FloatType> img) {
+		double[] location = new double[D];
+		for (int i = 0; i < N; ++i) {
+			for (int d = 0; d < D; ++d) {
+				location[d] = (mX.getEntry(i, d) * scale[d] + translate[d]);
+			}
+			// TODO: Use function from klim.utils
+			addGaussian(img, location, sigma);
+		}
+	}
+	
 	//----------------------------------------//
 
 	private static class ElementwiseInverse implements UnivariateFunction {
@@ -501,7 +628,6 @@ public class ApacheCPD {
 			return 1.0/x;
 		}
 	}
-
 
 	//-- Move all visitors to the new class file --//
 
@@ -677,10 +803,77 @@ public class ApacheCPD {
 		// new CoherentPointDrift().readCSV();
 	}
 	
+	public void testRigid(){
+		new ImageJ();
+
+		double w = 0.1;
+		double beta = 2;
+		double lambda = 3;
+		int maxIteration = 30;
+
+		final Img<FloatType> img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
+
+		// read data first
+		// TODO: reading here
+		int D = 2; // dimensionality of the point set
+		int M = 91; // # of points in the first point set
+		int N = 91; // # of points in the second point set
+		
+		String path = "/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/";
+		String from = path + "fishy-fish-rigid-x.csv";
+		String to = path + "fishy-fish-rigid-y.csv";
+		
+
+		// pass it as arguments
+		new ApacheCPD(img, N, M, D, w, beta, lambda, maxIteration).runRigidRegistration(0, from, to);
+		// new CoherentPointDrift().readCSV();
+	}
+	
+	
+	// TODO: move this one to some other class
+	// taken frome radial symmetry for test purposes only
+	final public static void addGaussian( final Img< FloatType > image, final double[] location, final double[] sigma )
+	{
+		final int numDimensions = image.numDimensions();
+		final int[] size = new int[ numDimensions ];
+		
+		final long[] min = new long[ numDimensions ];
+		final long[] max = new long[ numDimensions ];
+		
+		final double[] two_sq_sigma = new double[ numDimensions ];
+		
+		for ( int d = 0; d < numDimensions; ++d )
+		{
+			size[ d ] = Util.getSuggestedKernelDiameter( sigma[ d ] ) * 2;
+			min[ d ] = (int)Math.round( location[ d ] ) - size[ d ]/2;
+			max[ d ] = min[ d ] + size[ d ] - 1;
+			two_sq_sigma[ d ] = 2 * sigma[ d ] * sigma[ d ];
+		}
+
+		final RandomAccessible< FloatType > infinite = Views.extendZero( image );
+		final RandomAccessibleInterval< FloatType > interval = Views.interval( infinite, min, max );
+		final IterableInterval< FloatType > iterable = Views.iterable( interval );
+		final Cursor< FloatType > cursor = iterable.localizingCursor();
+		
+		while ( cursor.hasNext() )
+		{
+			cursor.fwd();
+			
+			double value = 1;
+			
+			for ( int d = 0; d < numDimensions; ++d )
+			{
+				final double x = location[ d ] - cursor.getIntPosition( d );
+				value *= Math.exp( -(x * x) / two_sq_sigma[ d ] );
+			}
+			
+			cursor.get().set( cursor.get().get() + (float)value );
+		}
+	}
 	
 	public static void main(String[] args) {
 		// new ApacheCPD().test();
-		new ApacheCPD().testAffine();
+		new ApacheCPD().testRigid();
 	}
 
 }
