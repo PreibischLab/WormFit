@@ -47,40 +47,40 @@ public class ApacheCPD {
 	final int N; // # of points in the first point set
 	final int M; // # of points in the second point set
 
-	double sigma2; // TODO: 2 for squared
+	double sigma2; // 2 for squared
 
 	// parameters
-	final double w; 	// amount of noise [0, 1]
-	final double beta;  // Briefly speaking, parameter defines the model of the smoothness regularizer (width of smoothing Gaussian filter).
+	final double w; 	 // amount of noise [0, 1]
+	final double beta;   // Briefly speaking, parameter defines the model of the smoothness regularizer (width of smoothing Gaussian filter).
 	final double lambda; // trade-off between the goodness of maximum likelihood fit and regularization.
 
-	// TODO: convert stuff to the HPC
-	// how to make this final
-	final RealMatrix mX; // N D
-	final RealMatrix mY; // M D
-	final RealMatrix mW; // M D
-	final RealMatrix mG; // M M
-	final RealMatrix mP; // M N
-	final RealMatrix mT; // M D transformation matrix
+	final RealMatrix mX; // NxD
+	final RealMatrix mY; // MxD
+	final RealMatrix mW; // MxD
+	final RealMatrix mG; // MxM
+	final RealMatrix mP; // MxN
+	final RealMatrix mT; // MxD transformation matrix
 
-	// these guys are necessary for proper visualization
+	// these variables are necessary for proper visualization
 	double[] translate;
 	double[] scale;
 	double[] sigma;
 
 	final int maxIteration;
 
-	public ApacheCPD(){
-		mX = null; // N D
-		mY = null;  // M D
-		mW = null; // M D
-		mG = null; // M M
-		mP = null; // M N
-		mT = null; // M D transformation matrix
 
+	// default constructor   
+	public ApacheCPD(){
 		D = 1;
 		M = 1;
 		N = 1; 
+		
+		mX = MatrixUtils.createRealMatrix(N, D); 
+		mY = MatrixUtils.createRealMatrix(M, D); 
+		mW = MatrixUtils.createRealMatrix(M, D); 
+		mG = MatrixUtils.createRealMatrix(M, M); 
+		mP = MatrixUtils.createRealMatrix(M, N); 
+		mT = MatrixUtils.createRealMatrix(M, D); 
 
 		w = 1;
 		beta = 1;
@@ -89,8 +89,17 @@ public class ApacheCPD {
 		maxIteration = 1;
 	}
 
-
-	// constructor
+	/** 
+	 * Constructor 
+	 * @param img - displays the result of fitting
+	 * @param N - total number of data points
+	 * @param M - total number of GMM centroids
+	 * @param D - dimensionality
+	 * @param w - amount of noise [0, 1]
+	 * @param beta - defines the model of the smoothness regularizer (width of smoothing Gaussian filter)
+	 * @param lambda - trade-off between the goodness of maximum likelihood fit and regularization
+	 * @param maxIteration - number of maximum iterations for the algorithm  
+	 * */
 	public ApacheCPD(Img<FloatType> img, int N, int M, int D, double w, double beta, double lambda, int maxIteration) {
 		this.img = img;
 
@@ -117,11 +126,54 @@ public class ApacheCPD {
 		scale = new double[] { 150, 150 };
 		sigma = new double[] { 3, 3 };
 	}
+	
+	// 
+	/**
+	 * Constructor  
+	 * @param img - displays the result of fitting
+	 * @param mX - data points
+	 * @param mY - GMM centroids
+	 * @param w - amount of noise [0, 1]
+	 * @param beta - defines the model of the smoothness regularizer (width of smoothing Gaussian filter)
+	 * @param lambda - trade-off between the goodness of maximum likelihood fit and regularization
+	 * @param maxIteration - number of maximum iterations for the algorithm  
+	 * */
+ 	public ApacheCPD(Img<FloatType> img, RealMatrix mX, RealMatrix mY, double w, double beta, double lambda, int maxIteration) {
+		this.img = img;
 
+		this.w = w;
+		this.beta = beta;
+		this.lambda = lambda;
 
-	protected void normalize(RealMatrix M){
-		int numColumns = M.getColumnDimension();
-		int numRows = M.getRowDimension();
+		this.maxIteration = maxIteration;
+		
+		this.D = mX.getColumnDimension(); // dimensionality of the point set
+		this.N = mX.getRowDimension(); // # of points in the first point set
+		this.M = mY.getRowDimension(); // # of points in the second point set
+
+		this.mX = mX;
+		this.mY = mY;		
+		mW = MatrixUtils.createRealMatrix(M, D);
+		mG = MatrixUtils.createRealMatrix(M, M);
+		mP = MatrixUtils.createRealMatrix(M, N);
+		mT = MatrixUtils.createRealMatrix(M, D);
+
+		// TODO: if nothing is working set matrix mW to 0 explicitly
+		// TODO: make this things calculated automatically
+		translate = new double[] { 250, 250 };
+		scale = new double[] { 150, 150 };
+		sigma = new double[] { 3, 3 };
+	}
+	
+	
+	
+ 	/**
+ 	 * Normalization of the matrix so that the mean = 0 and standard deviation = 1
+ 	 * @param mA - matrix to normalize
+ 	 * */
+ 	protected void normalize(RealMatrix mA){
+		int numColumns = mA.getColumnDimension();
+		int numRows = mA.getRowDimension();
 
 		double [] sumOverColumns = new double [numColumns];
 		// zero mean
@@ -130,7 +182,7 @@ public class ApacheCPD {
 
 		ColumnSumVisitor columnSumVisitor = new ColumnSumVisitor(sumOverColumns);
 		columnSumVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
-		M.walkInOptimizedOrder(columnSumVisitor);
+		mA.walkInOptimizedOrder(columnSumVisitor);
 		columnSumVisitor.end();
 
 		for(int d = 0; d < numColumns; ++d)		
@@ -138,36 +190,31 @@ public class ApacheCPD {
 
 		ColumnSubtractValueVisitor columnSubtractValueVisitor = new ColumnSubtractValueVisitor(sumOverColumns);
 		columnSubtractValueVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
-		M.walkInOptimizedOrder(columnSubtractValueVisitor);
+		mA.walkInOptimizedOrder(columnSubtractValueVisitor);
 		columnSubtractValueVisitor.end();
 
 		// std = 1
 		MatrixSumElementsVisitor matrixSumSquaredElementsVisitor = new MatrixSumElementsVisitor(1);
 		matrixSumSquaredElementsVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
-		M.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
+		mA.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
 		double scaleValue = matrixSumSquaredElementsVisitor.end();
 
 		scaleValue /= numRows;
 		scaleValue = Math.sqrt(scaleValue);
 
-		// TODO: Is not this the shortcut for the stuff below? -- M.scalarMultiply(1./scaleValue);
-		MatrixVisitor matrixVisitor = new MatrixVisitor(scaleValue);
-		matrixVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
-		M.walkInOptimizedOrder(matrixVisitor);
-		matrixVisitor.end();
-
-
-
-		// System.out.println("If this factor is not 1 then normalization is wrong! " + res/numRows);
+		mA.setSubMatrix(mA.scalarMultiply(1./scaleValue).getData(), 0, 0);
 	}
 
-	// calculates sigma squared
-	protected double getSigma2(RealMatrix X, RealMatrix Y){
-		int M = Y.getRowDimension();
-		int N = X.getRowDimension();
+	/**
+	 * Calculate sigma<sup>2</sup>
+	 * @param mA - data points
+	 * @param mB - GMM centroids
+	 * */
+	protected double getSigma2(RealMatrix mA, RealMatrix mB){
+		int M = mB.getRowDimension();
+		int N = mA.getRowDimension();
 
-		int D = X.getColumnDimension(); 
-
+		int D = mA.getColumnDimension(); 
 
 		double [] sumMX = new double[D];
 		double [] sumMY = new double[D];
@@ -177,41 +224,43 @@ public class ApacheCPD {
 			sumMY[d] = 0;
 		}
 
-		ColumnSumVisitor columnSumVisitorMX= new ColumnSumVisitor(sumMX);
+		ColumnSumVisitor columnSumVisitorMX = new ColumnSumVisitor(sumMX);
 		columnSumVisitorMX.start(N, D, 0, N - 1, 0, D - 1);
-		X.walkInRowOrder(columnSumVisitorMX);
+		mA.walkInRowOrder(columnSumVisitorMX);
 		columnSumVisitorMX.end();
 
 		ColumnSumVisitor columnSumVisitorMY = new ColumnSumVisitor(sumMY);
 		columnSumVisitorMY.start(M, D, 0, M - 1, 0, D - 1);
-		Y.walkInRowOrder(columnSumVisitorMY);
+		mB.walkInRowOrder(columnSumVisitorMY);
 		columnSumVisitorMY.end();
 
 		double sum = 0;
 		for (int d  = 0; d < D; d++)
 			sum += sumMX[d]*sumMY[d];
 
-		double res = (double) (M * X.transpose().multiply(X).getTrace() + N * Y.transpose().multiply(Y).getTrace() - 2*sum) / (M*N*D);
+		double res = (double) (M * mA.transpose().multiply(mA).getTrace() + N * mB.transpose().multiply(mB).getTrace() - 2*sum) / (M*N*D);
 
 		return res; 
 
 	}
 
-	// calculates G matrix 
+	/**
+	 * Compute the G matrix
+	 * */
 	protected void calculateG(RealMatrix Y, RealMatrix G, double beta){
 		long M = Y.getRowDimension();
-
-		// TODO: G is symmetric any better way to store it here 
 		for (int i = 0; i < M; i++){
 			for (int j = 0; j < M; j++){
-				double val = (double) Y.getRowVector(i).subtract(Y.getRowVector(j)).getNorm(); // TODO: might be simplified ?!
+				double val = Y.getRowVector(i).getDistance(Y.getRowVector(j));
 				val *= -val/(2*beta*beta);
 				G.setEntry(i, j, Math.exp(val));
 			}	
 		}
 	}
 
-	// upadate sigma squared value 
+	/**
+	 * Update sigma <sup>2</sup> 
+	 * */
 	protected double updateSigma2(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix T){
 		double res = 0; 
 
@@ -220,13 +269,10 @@ public class ApacheCPD {
 		int M = Y.getRowDimension();
 		int N = X.getRowDimension();
 		int D = X.getColumnDimension();
-
-
+		
 		RealVector bigOneM = new ArrayRealVector(M, 1);
 		RealVector bigOneN = new ArrayRealVector(N, 1);
 
-
-		// TODO: Check this part for errors
 		terms[0] = (X.transpose().multiply(new DiagonalMatrix(P.transpose().operate(bigOneM).toArray()))).multiply(X).getTrace();
 		terms[1] = ((P.multiply(X)).transpose().multiply(T)).getTrace()*(-2);
 		terms[2] = T.transpose().multiply(new DiagonalMatrix(P.operate(bigOneN).toArray()).multiply(T)).getTrace();
@@ -234,7 +280,7 @@ public class ApacheCPD {
 		for (int j = 0; j < terms.length; ++j)
 			res += terms[j];
 
-		double N_P = 0; 
+		double N_P = 0;
 		MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
 		matrixSumElementsVisitor.start(M, N, 0, M - 1, 0, N - 1);
 		P.walkInOptimizedOrder(matrixSumElementsVisitor);
@@ -246,8 +292,10 @@ public class ApacheCPD {
 
 	}
 
-
-	protected double calculateP(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix W, RealMatrix G, double w_, double sigmaSq){
+	/**
+	 * Calculate P for the non-rigid transformation
+	 * */
+	protected double calculatePnonRigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix W, RealMatrix G, double w_, double sigmaSq){
 		long M = Y.getRowDimension();
 		long N = X.getRowDimension();
 		long D = X.getColumnDimension();		
@@ -255,12 +303,12 @@ public class ApacheCPD {
 		double error = 0;
 		for (int n = 0; n < N; ++n) {
 			for (int m = 0; m < M; ++m) {
-				double val = X.getRowVector(n).subtract(Y.getRowVector(m).add(W.preMultiply(G.getRowVector(m)))).getNorm();
+				double val = X.getRowVector(n).getDistance(Y.getRowVector(m).add(W.preMultiply(G.getRowVector(m))));
 				val *= -val / (2 * sigmaSq);
 				val = Math.exp(val);				
 				double denom = 0;				
 				for (int k = 0; k < M; ++k) {
-					double tmp = X.getRowVector(n).subtract(Y.getRowVector(k).add(W.preMultiply(G.getRowVector(k)))).getNorm();
+					double tmp = X.getRowVector(n).getDistance(Y.getRowVector(k).add(W.preMultiply(G.getRowVector(m))));
 					tmp *= -tmp / (2 * sigmaSq);
 					denom += Math.exp(tmp);
 				}
@@ -279,6 +327,8 @@ public class ApacheCPD {
 		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
 	}
 
+	
+	
 	public int runNonRigidRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
 
@@ -302,7 +352,7 @@ public class ApacheCPD {
 			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
 
 			errorOld = error;
-			error = calculateP(mX, mY, mP, mW, mG, w, sigma2);
+			error = calculatePnonRigid(mX, mY, mP, mW, mG, w, sigma2);
 			error += lambda/2*(mW.transpose().multiply(mG).multiply(mW)).getTrace();
 
 			RealVector bigOneN = new ArrayRealVector(N, 1);
@@ -871,9 +921,10 @@ public class ApacheCPD {
 		}
 	}
 	
+
 	public static void main(String[] args) {
 		// new ApacheCPD().test();
-		new ApacheCPD().testRigid();
+		new ApacheCPD().testNonRigid();
 	}
 
 }
