@@ -268,8 +268,8 @@ public class ApacheCPD {
 		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
 	}
 
-	public int runNonRigidRegistration(int flag){
-		readData(mX, mY);
+	public int runNonRigidRegistration(int flag, String from, String to){
+		readData(mX, mY, from, to);
 
 		// TODO: 
 		// addPoints(img);
@@ -287,7 +287,7 @@ public class ApacheCPD {
 		double errorOld = 1;
 
 		int iter = 0; 
-		
+
 		// TODO: add error estimator here 
 		while (iter++ < maxIteration && sigma2 > 1e-10){
 			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
@@ -302,7 +302,7 @@ public class ApacheCPD {
 			invP.mapToSelf(new ElementwiseInverse());
 
 			System.out.println("goes to this part");
-			
+
 			RealMatrix A = mG.add((new DiagonalMatrix(invP.toArray())).scalarMultiply(sigma2 * lambda));
 			RealMatrix b = ((new DiagonalMatrix(invP.toArray())).multiply(mP).multiply(mX)).subtract(mY);
 
@@ -321,64 +321,91 @@ public class ApacheCPD {
 		return 0; // TODO: is 0 here for the normal execution 
 	}
 
-	public void runAffineRegistration(int flag){
-		RealMatrix mB = MatrixUtils.createRealIdentityMatrix(D);
- 		// double t = 0; // some other parameter 
+	// TODO: extend the functionality of this one
+	// should be used by affine and rigid registrations
+	// AR for affine and rigid 
+	public double calculatePAR(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix B, RealVector t, double w_, double sigmaSq){
+		long M = Y.getRowDimension();
+		long N = X.getRowDimension();
+		long D = X.getColumnDimension();		
+
+		double error = 0;
+		for (int n = 0; n < N; ++n) {
+			for (int m = 0; m < M; ++m) {
+				double val = (X.getRowVector(n).subtract(B.operate(Y.getRowVector(m)).add(t))).getNorm();
+				val *= -val / (2 * sigmaSq);
+				val = Math.exp(val);				
+				double denom = 0;				
+				for (int k = 0; k < M; ++k) {
+					double tmp = (X.getRowVector(n).subtract(B.operate(Y.getRowVector(k)).add(t))).getNorm();
+					tmp *= -tmp / (2 * sigmaSq);
+					denom += Math.exp(tmp);
+				}
+
+				denom += w_ / (1 - w_) * Math.pow(2 * Math.PI * sigmaSq, D / 2.0) * M / N;
+				P.setEntry(m, n, val/denom);
+			}
+		} 
+		return error; 
+	}
+
+	public void runAffineRegistration(int flag, String from, String to){
+		readData(mX, mY, from, to);
 		
+		RealMatrix mB = MatrixUtils.createRealIdentityMatrix(D);
+		// double t = 0; // some other parameter 
+
 		RealVector t = MatrixUtils.createRealVector(new double[D]);
 		t.set(0);
-		
-		
+
+
 		sigma2 = getSigma2(mX, mY); // TODO: this looks fine but who knows
-		
+
 		double error= 1; 
 		double errorOld = 1;
-		
+
 		int iter = 0;
 		while (iter++ < maxIteration && sigma2 > 1e-10){
 			printLog(iter, sigma2, Math.abs((error - errorOld)/error));
-			
-			// TODO: implement calculation of P
-			// computation of P might be generalized
-			// computeP(...)
-			
+
+			calculatePAR(mX, mY, mP, mB, t, w, sigma2);
+
 			double N_P = 0; 
 			MatrixSumElementsVisitor matrixSumElementsVisitor = new MatrixSumElementsVisitor(0);
 			matrixSumElementsVisitor.start(M, N, 0, M - 1, 0, N - 1);
 			mP.walkInOptimizedOrder(matrixSumElementsVisitor);
 			N_P = matrixSumElementsVisitor.end();
-			
+
 			RealVector muX = (mX.transpose().multiply(mP.transpose()).operate(new ArrayRealVector(M, 1))).mapDivide(N_P);
 			RealVector muY = (mY.transpose().multiply(mP).operate(new ArrayRealVector(N, 1))).mapDivide(N_P);
-			
+
 			// zero mean
 			RealMatrix meanX = mX.subtract(new ArrayRealVector(M, 1).outerProduct(muX));
 			RealMatrix meanY = mY.subtract(new ArrayRealVector(N, 1).outerProduct(muY));
-			
+
 			// TODO: use set instead
 			// check if this freaking line is correct at all 
 			mB = (meanX.transpose().multiply(mP.transpose().multiply(meanY))).multiply(MatrixUtils.inverse(meanY.transpose().multiply((new DiagonalMatrix(mP.transpose().operate(new ArrayRealVector(M, 1)).toArray()).multiply(meanY)))));
-			
+
 			t.setSubVector(0, muX.subtract(mB.operate(muY)));
-			
+
 			// twoo terms for the sum
 			double [] terms = new double [2];
-			
+
 			terms[0] = meanX.transpose().multiply(new DiagonalMatrix(mP.transpose().operate(new ArrayRealVector(N, 1)).toArray()).multiply(meanX)).getTrace();
 			terms[1] = meanX.transpose().multiply(mP.transpose().multiply(meanY).multiply(mB.transpose())).getTrace();
-			
+
 			sigma2 = (terms[0] - terms[1])/(N_P*D);
-			
+
 		}
-		
-		
+
 		mT.setSubMatrix((mY.multiply(mB.transpose())).add(new ArrayRealVector(M, 1).outerProduct(t)).getData(), 0, 0);
-		
+
 	}
-	
+
 	//-- reading part move to another class --// 
-	public void readData(RealMatrix X, RealMatrix Y) {
-		readCSV(); // reading is fine
+	public void readData(RealMatrix X, RealMatrix Y, String from, String to) {
+		readCSV(from, to); // reading is fine
 		normalize(X);
 		normalize(Y);
 	}
@@ -388,12 +415,12 @@ public class ApacheCPD {
 	// ugly function to read mx and mY from CSV
 
 	// TODO: move to the apache math3 from la4j
-	public void readCSV() {
+	public void readCSV(String from, String to) {
 		CSVReader reader = null;
 		String[] nextLine;
 
 		try {
-			reader = new CSVReader(new FileReader("woo ella worm-straight.csv"), '\t');
+			reader = new CSVReader(new FileReader(from), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -410,7 +437,7 @@ public class ApacheCPD {
 		}
 
 		try {
-			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-folded.csv"), '\t');
+			reader = new CSVReader(new FileReader(to), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -557,7 +584,7 @@ public class ApacheCPD {
 			return 0; // 0 for everything is fine 
 		}
 	}
-	
+
 
 	// this is a matrix visitor that returns the squared sum over columns
 	public class MatrixSumElementsVisitor implements RealMatrixPreservingVisitor{
@@ -596,8 +623,35 @@ public class ApacheCPD {
 		// M.setEntry(j, d, d + 1);
 		normalize(matrix);
 	}
-	
-	public void testRigid(){
+
+	public void testNonRigid(){
+		new ImageJ();
+
+		double w = 0.1;
+		double beta = 2;
+		double lambda = 3;
+		int maxIteration = 30;
+
+		final Img<FloatType> img = new ArrayImgFactory<FloatType>().create(new long[] { 500, 500 }, new FloatType());
+
+		// read data first
+		// TODO: reading here
+		// TODO:  make the calculation of these parameters automatic
+		int D = 2; // dimensionality of the point set
+		int M = 112; // # of points in the first point set
+		int N = 133; // # of points in the second point set
+
+		String path = "/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/";
+		String from = path + "worm-folded.csv";
+		String to = path + "worm-straight.csv";
+		
+		
+		// pass it as arguments
+		new ApacheCPD(img, N, M, D, w, beta, lambda, maxIteration).runNonRigidRegistration(0, from, to) ;
+		// new CoherentPointDrift().readCSV();
+	}
+
+	public void testAffine(){
 		new ImageJ();
 
 		double w = 0.1;
@@ -610,17 +664,23 @@ public class ApacheCPD {
 		// read data first
 		// TODO: reading here
 		int D = 2; // dimensionality of the point set
-		int M = 133; // # of points in the first point set
-		int N = 112; // # of points in the second point set
+		int M = 91; // # of points in the first point set
+		int N = 91; // # of points in the second point set
+		
+		String path = "/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/";
+		String from = path + "fishy-fish-x.csv";
+		String to = path + "fishy-fish-y.csv";
+		
 
 		// pass it as arguments
-		new ApacheCPD(img, N, M, D, w, beta, lambda, maxIteration).runNonRigidRegistration(0);
+		new ApacheCPD(img, N, M, D, w, beta, lambda, maxIteration).runAffineRegistration(0, from, to);
 		// new CoherentPointDrift().readCSV();
 	}
-
+	
+	
 	public static void main(String[] args) {
 		// new ApacheCPD().test();
-		new ApacheCPD().testRigid();
+		new ApacheCPD().testAffine();
 	}
 
 }
