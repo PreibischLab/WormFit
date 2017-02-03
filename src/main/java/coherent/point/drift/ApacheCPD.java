@@ -327,11 +327,24 @@ public class ApacheCPD {
 		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
 	}
 
-	
-	
+	/**
+	 * use this method if you want to read data X, Y from file 
+	 * */
 	public int runNonRigidRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
-
+		return runNonRigidRegistration(flag);
+	}
+	
+	/**
+	 * use this method if you already have data X, Y
+	 * */
+	public int runNonRigidRegistration(int flag, RealMatrix mX, RealMatrix mY){
+		this.mX.setSubMatrix(mX.getData(), 0, 0);
+		this.mY.setSubMatrix(mY.getData(), 0, 0);
+		return runNonRigidRegistration(flag);
+	}
+		
+	protected int runNonRigidRegistration(int flag){	
 		addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
@@ -406,9 +419,24 @@ public class ApacheCPD {
 		return error; 
 	}
 
+	/**
+	 * use this method if you want to read data X, Y from file 
+	 * */
 	public int runAffineRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
-		
+		return runAffineRegistration(flag);
+	}
+	
+	/**
+	 * use this method if you already have data X, Y
+	 * */
+	public int runAffineRegistration(int flag, RealMatrix mX, RealMatrix mY){
+		this.mX.setSubMatrix(mX.getData(), 0, 0);
+		this.mY.setSubMatrix(mY.getData(), 0, 0);
+		return runAffineRegistration(flag);
+	}
+
+	public int runAffineRegistration(int flag){		
 		addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
@@ -469,7 +497,6 @@ public class ApacheCPD {
 		return 0;
 	}
 
-	
 	public void computePrigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix R, double s, RealVector t, double w_, double sigmaSq){
 		calculatePAR(X, Y, P, R.scalarMultiply(s), t, w_, sigmaSq);
 	}
@@ -478,9 +505,24 @@ public class ApacheCPD {
 		calculatePAR(X, Y, P, B, t, w_, sigmaSq);
 	}
 	
+	/**
+	 * use this method if you want to read data X, Y from file 
+	 * */
 	public int runRigidRegistration(int flag, String from, String to){
 		readData(mX, mY, from, to);
-		
+		return runRigidRegistration(flag);
+	}
+	
+	/**
+	 * use this method if you already have data X, Y
+	 * */
+	public int runRigidRegistration(int flag, RealMatrix mX, RealMatrix mY){
+		this.mX.setSubMatrix(mX.getData(), 0, 0);
+		this.mY.setSubMatrix(mY.getData(), 0, 0);
+		return runRigidRegistration(flag);
+	}
+	
+	public int runRigidRegistration(int flag){		
 		addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
