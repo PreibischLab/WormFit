@@ -24,7 +24,6 @@ import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
-import test.TestGauss3d;
 import util.opencsv.CSVReader;
 import util.opencsv.CSVWriter;
 
@@ -128,7 +127,7 @@ public class CoherentPointDrift {
 				location[d] = (mX.get(i, d) * scale[d] + translate[d]);
 			}
 			// TODO: Use function from klim.utils
-			TestGauss3d.addGaussian(img, location, sigma);
+			ApacheCPD.addGaussian(img, location, sigma);
 		}
 	}
 
@@ -328,7 +327,7 @@ public class CoherentPointDrift {
 		// TODO: update to use the functionality of la4j
 		readData(mX, mY);
 		// fill image with points that has to be detected
-		addPoints(img);
+		// addPoints(img);
 		imp = ImageJFunctions.wrapFloat(img, "Put an overlay on top!");
 		imp.show();
 
@@ -366,7 +365,7 @@ public class CoherentPointDrift {
 			mY.add(mG.multiply(mW)).apply(LinearAlgebra.IN_PLACE_COPY_MATRIX_TO_MATRIX, mT);
 			sigma2 = updateSigma2(mX, mY, mP, mT);
 
-			addOverlay(imp, mT);
+		//addOverlay(imp, mT);
 		}
 
 		// writeCSV();
@@ -384,7 +383,7 @@ public class CoherentPointDrift {
 		String[] nextLine;
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-straight.csv"), '\t');
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-straight.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -401,7 +400,7 @@ public class CoherentPointDrift {
 		}
 
 		try {
-			reader = new CSVReader(new FileReader("/Users/kkolyva/Desktop/cpd_ex/worm-folded.csv"), '\t');
+			reader = new CSVReader(new FileReader("/home/milkyklim/Documents/imglib2Dev/WormFit/src/main/resources/worm-folded.csv"), '\t');
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
