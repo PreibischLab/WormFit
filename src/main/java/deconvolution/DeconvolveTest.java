@@ -2,7 +2,7 @@ package deconvolution;
 
 import ij.ImagePlus;
 import ij.ImageStack;
-import klim.DeconvolutionTest;
+import klim.deconvolution.DeconvolutionTest;
 
 import java.util.Date;
 
