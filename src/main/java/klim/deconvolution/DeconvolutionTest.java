@@ -64,7 +64,7 @@ public class DeconvolutionTest {
 		long[] offset = new long[numDimensions];
 		getOffset(psf, offset); 
 
-		if (debug){
+		if (debug){ // show each bead
 			long [] min = new long [numDimensions];
 			long [] max = new long [numDimensions];
 
@@ -253,7 +253,7 @@ public class DeconvolutionTest {
 		// why the fuck this error is here?!
 		// TODO: This number below is super important and should be set as the parameter
 		// Otherwise fitting won't work
-		PeakFitter<T> pf = new PeakFitter(img, peaks, new DummySolver(), new Gaussian(), new MLGaussianEstimator(7.0, numDimensions));
+		PeakFitter<T> pf = new PeakFitter<>(img, peaks, new DummySolver(), new Gaussian(), new MLGaussianEstimator(7.0, numDimensions));
 		pf.process();
 
 		// @DEBUG: 
@@ -340,9 +340,7 @@ public class DeconvolutionTest {
 
 	}
 
-
-
-	// run for every second slice set to specicif value
+	// run for every second slice set to specific valuesdd
 	public static void mainDeconvolutionSliced() {
 
 		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";

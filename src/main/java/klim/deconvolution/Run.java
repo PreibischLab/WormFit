@@ -70,7 +70,7 @@ public class Run {
 		// size of the beads should be the parameter
 		long [] psfSize = new long[]{15,15,15};
 		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(psfSize, new FloatType());
-		Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "beads-yellow.tif"));
+		Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "beads-bw-large.tif"));
 		Img<BitType> out = new ArrayImgFactory<BitType>().create(beads, new BitType());
 
 		ImageJFunctions.show(beads);
