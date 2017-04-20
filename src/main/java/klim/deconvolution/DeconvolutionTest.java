@@ -148,9 +148,10 @@ public class DeconvolutionTest {
 			beadsCursor.fwd();
 			isBroken = false;
 
+			// FIXME: This calculation is wrong!  
 			// setting to 0 and img.max(d) ensures the normal program flow
 			for (int d = 0; d < numDimensions; d++) {
-				min[d] = Math.max(beadsCursor.getLongPosition(d) - offset[d], 0);
+				min[d] = Math.max(beadsCursor.getLongPosition(d) - offset[d], img.min(d));
 				max[d] = Math.min(beadsCursor.getLongPosition(d) + offset[d], img.max(d));
 			}
 
