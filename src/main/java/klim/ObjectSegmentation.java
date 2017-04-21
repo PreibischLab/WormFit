@@ -56,7 +56,8 @@ public class ObjectSegmentation {
 			}	
 			pixelsPerBead[idx]++;
 		}
-
+		
+		// fins approximate center
 		for (int j = 0; j < numBeads; ++j){
 			for (int d = 0; d < img.numDimensions(); d++)
 				averageBeadsCoordinates[j][d] /= pixelsPerBead[j];

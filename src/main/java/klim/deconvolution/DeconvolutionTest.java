@@ -1,10 +1,16 @@
 package klim.deconvolution;
 
+import java.awt.Color;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import compute.RadialSymmetry;
+import fit.Spot;
+import gradient.Gradient;
+import gui.interactive.HelperFunctions;
 import ij.ImageJ;
+import ij.ImagePlus;
 import klim.ObjectSegmentation;
 import klim.Thresholding;
 import net.imglib2.Cursor;
@@ -16,12 +22,14 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealInterval;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.RealRandomAccessible;
+import net.imglib2.algorithm.localextrema.RefinedPeak;
 import net.imglib2.algorithm.localization.DummySolver;
 import net.imglib2.algorithm.localization.Gaussian;
 import net.imglib2.algorithm.localization.MLGaussianEstimator;
 import net.imglib2.algorithm.localization.PeakFitter;
 import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
+import net.imglib2.img.ImgFactory;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.interpolation.randomaccess.NLinearInterpolatorFactory;
@@ -31,7 +39,10 @@ import net.imglib2.type.logic.BitType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.util.Util;
 import net.imglib2.view.Views;
+import parameters.GUIParams;
+import parameters.RadialSymmetryParameters;
 import util.ImgLib2Util;
 
 public class DeconvolutionTest {
@@ -148,12 +159,13 @@ public class DeconvolutionTest {
 			beadsCursor.fwd();
 			isBroken = false;
 
-			// FIXME: This calculation is wrong!  
 			// setting to 0 and img.max(d) ensures the normal program flow
 			for (int d = 0; d < numDimensions; d++) {
+				// System.out.print(beadsCursor.getFloatPosition(d) + " ");
 				min[d] = Math.max(beadsCursor.getLongPosition(d) - offset[d], img.min(d));
 				max[d] = Math.min(beadsCursor.getLongPosition(d) + offset[d], img.max(d));
 			}
+			// System.out.println();
 
 			// if the bead (+ boundary) fits in the image
 			isBroken = isFar(min, max, offset, numDimensions);
@@ -177,8 +189,8 @@ public class DeconvolutionTest {
 				RandomAccessibleInterval<T> adjustedPsf = new ArrayImgFactory<T>().create(psf, Views.iterable(img).firstElement());
 				fitGaussian(img, beadPosition, typicalSigma, adjustedPsf);
 
-				//				System.out.println(Views.iterable(adjustedPsf).size() + " " + Views.iterable(psf).size());
-				ImageJFunctions.show(adjustedPsf).setTitle("bead");
+				// System.out.println(Views.iterable(adjustedPsf).size() + " " + Views.iterable(psf).size());
+				// ImageJFunctions.show(adjustedPsf).setTitle("bead");
 				Utils.accumulateValues(adjustedPsf, psf);
 			}
 		}
@@ -302,25 +314,92 @@ public class DeconvolutionTest {
 		// new part // 		
 		double [] element = pf.getResult().values().iterator().next(); // there is only one element in this collection		
 
+		Utils.printArray(element);
+
 		double [] realMin = new double[numDimensions];
 		double [] realMax = new double[numDimensions];
 		Utils.setRealMinMax(realMin, realMax, element);
-		FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax );
+		FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
+		// TODO: Why do we need this extension here? 
 		recalculateCoordinates(Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<T>()), psf, realInterval);
 
 	}
 
+
+	public static void useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long typicalSigma, RandomAccessibleInterval<FloatType> psf){
+		
+		int numDimensions = img.numDimensions();
+		
+		final GUIParams params = new GUIParams();
+		params.setDefaultValues(); 
+
+		// checked image beforehand
+		// TODO: either pass these values or set them here 
+		params.setSigmaDog(4);
+		params.setThresholdDoG(0.003f); 
+		params.setSupportRadius(2);
+		params.setMaxError(3);
+		params.setInlierRatio(0.9f);
+
+		ImagePlus imp = ImageJFunctions.wrap(img, "");
+
+
+		double [] calibration = HelperFunctions.initCalibration(imp, numDimensions); // new double[]{1, 1, 1};
+
+		RadialSymmetryParameters rsm = new RadialSymmetryParameters(params, calibration);
+
+		RadialSymmetry rs = new RadialSymmetry(rsm, img);
+
+		for (Spot spot : rs.getSpots()){
+			if (spot.numRemoved != spot.candidates.size()){
+				for (int d = 0; d < img.numDimensions(); ++d){
+					System.out.print(spot.getFloatPosition(d) + " ");
+				}
+				System.out.println();
+			}
+		}
+				
+		int hello = 0;
+		for (Spot spot : rs.getSpots()){
+			if (spot.numRemoved != spot.candidates.size()){ // if the spot is not discarded
+				// TODO: take these variables out of the loop
+				double [] element = spot.getCenter();
+				double [] realMin = new double[numDimensions];
+				double [] realMax = new double[numDimensions];
+				
+//				for (int d = 0; d < numDimensions; ++d){
+//					element[d] += 0.5;
+//				}
+				
+				// x - radius + 0.5
+				
+				Utils.setRealMinMax(realMin, realMax, element, typicalSigma);
+				
+				FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
+				
+				recalculateCoordinates(Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<FloatType>()), psf, realInterval);			
+				if (hello++ == 3) break;
+			}
+		}
+		
+		// imp.show();
+		HelperFunctions.drawRealLocalizable( rs.getSpots(), imp, 2, Color.RED, false);
+
+	}
+
+
 	// copies data from float grid to integer one
 	public static <T extends RealType<T>> void recalculateCoordinates(RealRandomAccessible<T> realImg, RandomAccessibleInterval<T> img, RealInterval interval){
 		int numDimensions = realImg.numDimensions();
-		long[] pixelSize = new long[ numDimensions ];
+		// long[] pixelSize = new long[ numDimensions ];
 		double[] intervalSize = new double[numDimensions];
-
-		double magnification = 1.0; // this one can be deleted later
+		
+		// TODO: remove the magnification it is always one
+		// double magnification = 1.0; // this one can be deleted later
 
 		for (int d = 0; d < numDimensions; ++d){
 			intervalSize[d] = interval.realMax(d) - interval.realMin(d);
-			pixelSize[d] = Math.round(intervalSize[d]*magnification) + 1;
+			// pixelSize[d] = Math.round(intervalSize[d]*magnification) + 1;
 		}
 
 		Cursor<T> cursor = Views.iterable(img).localizingCursor();
@@ -339,9 +418,11 @@ public class DeconvolutionTest {
 			cursor.get().set(realRandomAccess.get());
 		}	
 
+		ImageJFunctions.show(img).setTitle("Another bead");
+
 	}
 
-	// run for every second slice set to specific valuesdd
+	// run for every second slice set to specific values
 	public static void mainDeconvolutionSliced() {
 
 		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/20_09_16_psf_results/";
@@ -366,7 +447,11 @@ public class DeconvolutionTest {
 		// runTestTotalIntensity();
 		// mainDeconvolution();
 		// runExtractGeneratedBeads();
+
+
 		Run.runExtractBeads();
+		//Run.runRSExtractBeads();
+
 		// runGaussianFitting();
 		// mainDeconvolutionSliced();
 		// testGaussianFitting();

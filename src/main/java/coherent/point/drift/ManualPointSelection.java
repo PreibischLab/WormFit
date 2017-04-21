@@ -45,8 +45,8 @@ public class ManualPointSelection {
 	final MyKeyListener keyListener;
 	
 	// file names
-	String name =  "worm-folded";
-	String dir = "/Users/kkolyva/Desktop/cpd_ex/";
+	String name = "beads-bw-large";// "worm-folded";
+	String dir = "/home/milkyklim/Desktop/" ;//"/Users/kkolyva/Desktop/cpd_ex/";
 	File output = new File(dir + name + ".csv");
 	File input = new File(dir + name + ".tif");
 

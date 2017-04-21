@@ -6,6 +6,7 @@ import deconvolution.AdjustInput;
 import deconvolution.DeconvolveTest;
 import deconvolution.LucyRichardson;
 import mpicbg.imglib.wrapper.ImgLib2;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
@@ -68,7 +69,8 @@ public class Run {
 
 		String path = pathUbuntu;
 		// size of the beads should be the parameter
-		long [] psfSize = new long[]{15,15,15};
+		long psfSizeXYZ = 15;
+		long [] psfSize = new long[]{psfSizeXYZ,psfSizeXYZ,psfSizeXYZ};
 		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(psfSize, new FloatType());
 		Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "beads-bw-large.tif"));
 		Img<BitType> out = new ArrayImgFactory<BitType>().create(beads, new BitType());
@@ -76,20 +78,70 @@ public class Run {
 		ImageJFunctions.show(beads);
 
 		Normalize.normalize(beads, new FloatType(0), new FloatType(255));
-
-		//thresholdNoise(psf, new FloatType(70.0f));
+		
+		// TODO: stuff above should be ok
+		
+		// TODO: Uncomment when done with debugging
+		// thresholdNoise(psf, new FloatType(70.0f));
 		// Normalize.normalize(beads, new FloatType(0), new FloatType(255));
 
 		float tVal = 180;
-		totalBeads += DeconvolutionTest.getPsf(beads, out, psf, new FloatType(tVal),  (long)(psfSize[0]/2));
+		totalBeads += DeconvolutionTest.getPsf(beads, out, psf, new FloatType(tVal), (long)(psfSize[0]/2));
 
 
 		System.out.println("Total number of beads found: " + totalBeads);
+		
+		// if (true) return;
 
 		Utils.getAverageValue(psf, totalBeads);
 		Utils.thresholdNoise(psf, new FloatType(10.0f));
 
 		ImageJFunctions.show(psf);
+	}
+	
+	// creates psf over the fitted gaussian
+	public static void createImageFromGaussFit(double [] parameters, long typicalSigma){
+		
+	}
+	
+	public static void runRSExtractBeads(){
+		long totalBeads = 0;		
+
+		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/";
+		String pathUbuntu = "/home/milkyklim/Desktop/";
+
+		String path = pathUbuntu;
+		// size of the beads should be the parameter
+		long psfSizeXYZ = 15;
+		long [] psfSize = new long[]{psfSizeXYZ,psfSizeXYZ,psfSizeXYZ};
+		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(psfSize, new FloatType());
+		Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "beads-bw-large.tif"));
+		Img<BitType> out = new ArrayImgFactory<BitType>().create(beads, new BitType());
+
+		ImageJFunctions.show(beads);
+
+		Normalize.normalize(beads, new FloatType(0), new FloatType(255));
+		
+		DeconvolutionTest.useRadialSymmetry(beads, (long)(psfSize[0]/2), psf);
+		
+		// TODO: stuff above should be ok
+		
+		// TODO: Uncomment when done with debugging
+		// thresholdNoise(psf, new FloatType(70.0f));
+		// Normalize.normalize(beads, new FloatType(0), new FloatType(255));
+
+		// float tVal = 180;
+		// totalBeads += DeconvolutionTest.getPsf(beads, out, psf, new FloatType(tVal), (long)(psfSize[0]/2));
+
+
+		// System.out.println("Total number of beads found: " + totalBeads);
+		
+		// if (true) return;
+
+		// Utils.getAverageValue(psf, totalBeads);
+		// Utils.thresholdNoise(psf, new FloatType(10.0f));
+
+		// ImageJFunctions.show(psf);
 	}
 	
 	// MAIN FUNCTION! run deconvolution

@@ -147,6 +147,20 @@ public class Utils {
 		}
 	}
 	
+	public static void setRealMinMax( double [] min, double [] max, double[] coord, double typicalSigma){
+		int numDimensions = min.length;
+		if (debug)
+			System.out.println("Radius = " + typicalSigma);
+		for (int d = 0; d < numDimensions; ++d){
+			min[d] = coord[d] - typicalSigma;
+			max[d] = coord[d] + typicalSigma;
+			if (debug)
+				System.out.println(min[d] + " : " + (coord[d]) + " : " + max[d]);
+			if ((max[d] - min[d]) % 2 == 1)
+				System.out.println("For coordinate d = " + d + ", the psf size is even!");
+		}
+	}
+	
 	public static <T extends RealType<T>> void setSliceValue(RandomAccessibleInterval<T> img, T val){
 		Cursor <T> cursor  = Views.iterable(img).localizingCursor();
 		long positionZ = 0; // indicates if the slice index is odd or even
@@ -162,6 +176,13 @@ public class Utils {
 			}
 		}	
 		ImageJFunctions.show(img);
+	}
+	
+	
+	public static void printArray(double [] a){
+		for (int j = 0; j < a.length; j++)
+			System.out.print(a[j] + " ");
+		System.out.println();
 	}
 	
 }
