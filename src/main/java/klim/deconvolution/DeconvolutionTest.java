@@ -75,6 +75,7 @@ public class DeconvolutionTest {
 		long[] offset = new long[numDimensions];
 		getOffset(psf, offset); 
 
+		// FIXME: Boundary check is wrong here!
 		if (debug){ // show each bead
 			long [] min = new long [numDimensions];
 			long [] max = new long [numDimensions];
@@ -326,6 +327,48 @@ public class DeconvolutionTest {
 	}
 
 
+	// creates psf over the fitted gaussian
+	public static void createImageFromGaussFit(double [] parameters, long typicalSigma, int numDimensions){
+		double [] realMin = new double[numDimensions];
+		double [] realMax = new double[numDimensions];
+		Utils.setRealMinMax(realMin, realMax, parameters);
+		
+		FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
+		
+//		int numDimensions = realImg.numDimensions();
+//		// long[] pixelSize = new long[ numDimensions ];
+//		double[] intervalSize = new double[numDimensions];
+//		
+//		// TODO: remove the magnification it is always one
+//		// double magnification = 1.0; // this one can be deleted later
+//
+//		for (int d = 0; d < numDimensions; ++d){
+//			intervalSize[d] = interval.realMax(d) - interval.realMin(d);
+//			// pixelSize[d] = Math.round(intervalSize[d]*magnification) + 1;
+//		}
+//
+//		Cursor<T> cursor = Views.iterable(img).localizingCursor();
+//		RealRandomAccess<T> realRandomAccess = realImg.realRandomAccess();
+//
+//		double[] position = new double[ numDimensions ];
+//
+//		while(cursor.hasNext()){
+//			cursor.fwd();
+//
+//			for (int d = 0; d < numDimensions; ++d){
+//				position[d] = cursor.getDoublePosition(d)/img.realMax(d)*intervalSize[d] + interval.realMin(d); 
+//			}
+//
+//			realRandomAccess.setPosition(position);			
+//			cursor.get().set(realRandomAccess.get());
+//		}	
+//
+//		ImageJFunctions.show(img).setTitle("Another bead");
+		
+		
+		
+	}
+	
 	public static void useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long typicalSigma, RandomAccessibleInterval<FloatType> psf){
 		
 		int numDimensions = img.numDimensions();
