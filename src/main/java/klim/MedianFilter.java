@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import ij.ImageJ;
+import klim.deconvolution.Utils;
 import net.imglib2.Cursor;
 import net.imglib2.Interval;
 import net.imglib2.IterableInterval;
@@ -23,6 +24,7 @@ import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
+import ome.xml.model.enums.handlers.ImmersionEnumHandler;
 import util.ImgLib2Util;
 
 public class MedianFilter
@@ -341,8 +343,37 @@ public class MedianFilter
 		return (dim + 1)*dir;
 	}
 
+	
+	/***
+	 * apply median filter slice-by-slice to a 3D image
+	 * @param src - input image
+	 * @param dst - final image
+	 * @param kernelDim - size of the kernel for median filter (2D)
+	 */
+	public static <T extends RealType<T> & Comparable<T>> void medianFilterSliced(final RandomAccessibleInterval< T > src, final RandomAccessibleInterval< T > dst, final int[] kernelDim){
+		int zDim = 2;
+		for (long z = src.min(zDim); z < src.max(zDim); ++z){
+			System.out.println("z coordinate processed: " + z);
+			medianFilter(Views.hyperSlice(src, zDim, z), Views.hyperSlice(dst, zDim, z), kernelDim);
+		}
+	}
+	
+	/**
+	 * returns number of slices to process
+	 * @param img - image
+	 * */
+	public static <T extends RealType<T> & Comparable<T>> long getNumSlices(final RandomAccessibleInterval< T > img){
+		long numSlices = 1; // by default there is one slice to process
+		
+		// skip x and y dimensions 
+		for(int d = 2; d < img.numDimensions(); d++)
+			numSlices *= d;
+		
+		return numSlices;
+	}
+	
 	public static void main(String [] args){
-		// new ImageJ(); // to have a menu!
+		new ImageJ(); // to have a menu!
 
 		// File file = new File("src/main/resources/Bikesgray.jpg");
 		// File file = new File("src/main/resources/salt-and-pepper.tif");
@@ -350,7 +381,7 @@ public class MedianFilter
 		// File file = new File("src/main/resources/test3D.tif");
 		// File file = new File("src/main/resources/inputMedian.png");
 		// File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one.tif");
-		File file = new File("../Documents/Useful/initial_worms_pics/1001-yellow-one-1.tif");
+		File file = new File("/home/milkyklim/Desktop/beads_tifs/cropped/tif-3-c.tif");
 		final Img<FloatType> img = ImgLib2Util.openAs32Bit(file);
 		final Img<FloatType> dst = img.factory().create(img, img.firstElement());
 		
@@ -360,38 +391,35 @@ public class MedianFilter
 		final long[] max = new long[n];
 
 		// not super important 
-		FloatType minValue = new FloatType();
-		FloatType maxValue = new FloatType();
-		minValue.set(0);
-		maxValue.set(255);		
-		Normalize.normalize(img, minValue, maxValue);
+//		FloatType minValue = new FloatType();
+//		FloatType maxValue = new FloatType();
+//		minValue.set(0);
+//		maxValue.set(255);		
+//		Normalize.normalize(img, minValue, maxValue);
 
-		//ImageJFunctions.show(img);
+		ImageJFunctions.show(img);
 
 		// while ( min != null )
 		// {
 		// define the size of the filter
-		int zz = 3;
+		int zz = 5;
 		// run multiple tests
 		for (int jj = zz; jj <= zz; jj += 2) {	
 
-			for (int d = 0; d < n; d++) {
-				min[d] = -jj;
-				max[d] = jj;
-			}
+//			for (int d = 0; d < n; d++) {
+//				min[d] = -jj;
+//				max[d] = jj;
+//			}
 			long inT  = System.nanoTime();
 			//final RandomAccessible< T > infSrc, final Interval srcInterval, final RandomAccessibleInterval< T > dst, final int[] kernelDim);
 			//medianFilter(img, dst, new FinalInterval(min, max));
-			medianFilter(img, dst, new int[]{jj, jj});
+			medianFilter(img, dst, new int[]{jj, jj, jj});
 			System.out.println("kernel = " + jj + "x" + jj + " : "+ TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inT)/1000.0);
 			ImageJFunctions.show(dst);
 		// }
 		}
 
 		//here comes filtering part 
-
-
-
 		// System.out.println("Doge!");
 	}	
 }
