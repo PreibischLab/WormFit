@@ -99,10 +99,7 @@ public class Run {
 		ImageJFunctions.show(psf);
 	}
 	
-	// creates psf over the fitted gaussian
-	public static void createImageFromGaussFit(double [] parameters, long typicalSigma){
-		
-	}
+
 	
 	public static void runRSExtractBeads(){
 		long totalBeads = 0;		
