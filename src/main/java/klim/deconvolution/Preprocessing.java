@@ -5,9 +5,11 @@ import java.io.File;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccess;
 import net.imglib2.img.Img;
+import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
 
 import deconvolution.AdjustInput;
+import ij.ImageJ;
 import mpicbg.imglib.wrapper.ImgLib2;
 import util.ImgLib2Util;
 
@@ -20,13 +22,16 @@ public class Preprocessing {
 		// median - average (get zero mean)
 		
 		// initial image - (median - average)
-		String path = "";
-		String file = "";
+		new ImageJ();
+		String path = "/home/milkyklim/Desktop/beads_tifs/cropped/";
+		String file = "tif-14-c";
 		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + file + ".tif"));
 		Img<FloatType> bg  = ImgLib2Util.openAs32Bit(new File(path + "bg/" + file + "-m.tif"));
 		
 		subtractAverage(bg);
 		subtractImgs(img, bg);
+		
+		ImageJFunctions.show(img);
 		
 	}
 	
