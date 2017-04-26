@@ -11,6 +11,7 @@ import gradient.Gradient;
 import gui.interactive.HelperFunctions;
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.measure.ResultsTable;
 import klim.ObjectSegmentation;
 import klim.Thresholding;
 import net.imglib2.Cursor;
@@ -25,13 +26,17 @@ import net.imglib2.RealRandomAccessible;
 import net.imglib2.algorithm.localextrema.RefinedPeak;
 import net.imglib2.algorithm.localization.DummySolver;
 import net.imglib2.algorithm.localization.Gaussian;
+import net.imglib2.algorithm.localization.LevenbergMarquardtSolver;
+import net.imglib2.algorithm.localization.MLEllipticGaussianEstimator;
 import net.imglib2.algorithm.localization.MLGaussianEstimator;
 import net.imglib2.algorithm.localization.PeakFitter;
 import net.imglib2.algorithm.stats.Normalize;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
 import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.interpolation.randomaccess.LanczosInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NLinearInterpolatorFactory;
 import net.imglib2.roi.labeling.ImgLabeling;
 import net.imglib2.type.NativeType;
@@ -47,7 +52,7 @@ import util.ImgLib2Util;
 
 public class DeconvolutionTest {
 
-	protected static final boolean debug = true;
+	protected static final boolean debug = false;
 
 	// calculate the size of the offset
 	public static <T extends RealType<T>> void getOffset(RandomAccessibleInterval<T> psf, long[] offset) {
@@ -141,6 +146,40 @@ public class DeconvolutionTest {
 		return isAlone;
 	}
 
+	// check if the bead is alone in the cropped image
+	public static <T extends RealType<T>> boolean isAlone2(double[] min, double[] max, double[] position,
+			ArrayList<Spot> spots, int numDimensions) {
+		
+		double eps = 1e-6;		
+		boolean isAlone = true;
+		
+		for (Spot spot: spots){
+			boolean isSame = true; 
+			
+			for (int d = 0; d < numDimensions; ++d)
+				if ((spot.getDoublePosition(d) - position[d]) > eps)
+					isSame = false;
+					
+			if (!isSame) { // not the same bead
+				boolean isInside = true;
+				
+				for (int d = 0; d < numDimensions; d++) {
+					if ((min[d] > spot.getDoublePosition(d)) || (spot.getDoublePosition(d) > max[d])) {
+						isInside = false;
+						break;
+					}
+				}
+				
+				if (isInside) {
+					isAlone = false;
+					break;
+				}
+			}
+		}
+		return isAlone;
+	}
+	
+	
 	// TODO: keep it here ?
 	// sum values of the psf (beads) for one image
 	public static <T extends RealType<T> & NativeType<T>> long sumPsf(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf, PointSampleList<T> beads, long[] offset, double typicalSigma) {
@@ -155,6 +194,8 @@ public class DeconvolutionTest {
 		long[] max = new long[numDimensions];
 
 		long[] position = new long[numDimensions];
+
+		ResultsTable rt = new ResultsTable();
 
 		while (beadsCursor.hasNext()) {
 			beadsCursor.fwd();
@@ -182,19 +223,26 @@ public class DeconvolutionTest {
 					numBrokenBeads++;
 				}
 			}
+			
+
 			if (!isBroken) {
 				ArrayList<double[]> parameters = new ArrayList<>(1);
 				long [] beadPosition = new long[numDimensions];	
 				beadsCursor.localize(beadPosition);
 
+				System.out.println( beadPosition[ 0 ] + " " + beadPosition[ 1 ] );
+				
 				RandomAccessibleInterval<T> adjustedPsf = new ArrayImgFactory<T>().create(psf, Views.iterable(img).firstElement());
-				fitGaussian(img, beadPosition, typicalSigma, adjustedPsf);
+				fitGaussian(img, beadPosition, typicalSigma, adjustedPsf, rt);
 
 				// System.out.println(Views.iterable(adjustedPsf).size() + " " + Views.iterable(psf).size());
 				// ImageJFunctions.show(adjustedPsf).setTitle("bead");
 				Utils.accumulateValues(adjustedPsf, psf);
 			}
+			
 		}
+
+		rt.show("Results");
 
 		return (beads.size() - numBrokenBeads); // return number of clear non-broken beads
 	}
@@ -292,13 +340,13 @@ public class DeconvolutionTest {
 	}
 
 
-	public static <T extends RealType<T>> void fitGaussian(RandomAccessibleInterval<T> img, long[] beadPosition, /*ArrayList<Localizable> peaks,*/ /*Collection<double[]> results,*/ double typicalSigma, RandomAccessibleInterval<T> psf){
+	public static <T extends RealType<T>> void fitGaussian(RandomAccessibleInterval<T> img, long[] beadPosition, /*ArrayList<Localizable> peaks,*/ /*Collection<double[]> results,*/ double typicalSigma, RandomAccessibleInterval<T> psf, ResultsTable rt){
 		int numDimensions = img.numDimensions();
 		// there is always only one element in the list
 		ArrayList<Localizable> peaks = new ArrayList<Localizable>(1);
 		peaks.add(new Point(beadPosition));
-
-		PeakFitter<T> pf = new PeakFitter<T>(img, peaks, new DummySolver(), new Gaussian(), new MLGaussianEstimator(typicalSigma, numDimensions));
+		
+		PeakFitter<T> pf = new PeakFitter<T>(img, peaks, new LevenbergMarquardtSolver(), new Gaussian(), new MLGaussianEstimator(typicalSigma, numDimensions)); // new MLEllipticGaussianEstimator(new double[]{typicalSigma, typicalSigma, typicalSigma})); 
 		pf.process();
 
 		if (debug){
@@ -312,6 +360,14 @@ public class DeconvolutionTest {
 			System.out.println(pf.toString());
 		}
 
+		if ( rt != null )
+		{
+			rt.incrementCounter();
+			double[] element = pf.getResult().values().iterator().next();
+			rt.addValue("x", String.format(java.util.Locale.US, "%.2f", element[0]));
+			rt.addValue("y", String.format(java.util.Locale.US, "%.2f", element[1]));
+			rt.addValue("z", String.format(java.util.Locale.US, "%.2f", element[2]));
+		}
 		// new part // 		
 		double [] element = pf.getResult().values().iterator().next(); // there is only one element in this collection		
 
@@ -323,127 +379,119 @@ public class DeconvolutionTest {
 		FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
 		// TODO: Why do we need this extension here? 
 		recalculateCoordinates(Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<T>()), psf, realInterval);
+		// createImageFromGaussFit(psf, element, numDimensions, realInterval);
 
 	}
 
 
 	// creates psf over the fitted gaussian
-	public static void createImageFromGaussFit(double [] parameters, long typicalSigma, int numDimensions){
-		double [] realMin = new double[numDimensions];
-		double [] realMax = new double[numDimensions];
-		Utils.setRealMinMax(realMin, realMax, parameters);
+	public static <T extends RealType<T>> void createImageFromGaussFit(RandomAccessibleInterval<T> img, double [] parameters, int numDimensions, FinalRealInterval interval){
+		double[] intervalSize = new double[numDimensions];
+
+		for (int d = 0; d < numDimensions; ++d){
+			intervalSize[d] = interval.realMax(d) - interval.realMin(d);
+		}
 		
-		FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
+		double[] position = new double[ numDimensions ];
 		
-//		int numDimensions = realImg.numDimensions();
-//		// long[] pixelSize = new long[ numDimensions ];
-//		double[] intervalSize = new double[numDimensions];
-//		
-//		// TODO: remove the magnification it is always one
-//		// double magnification = 1.0; // this one can be deleted later
-//
-//		for (int d = 0; d < numDimensions; ++d){
-//			intervalSize[d] = interval.realMax(d) - interval.realMin(d);
-//			// pixelSize[d] = Math.round(intervalSize[d]*magnification) + 1;
-//		}
-//
-//		Cursor<T> cursor = Views.iterable(img).localizingCursor();
-//		RealRandomAccess<T> realRandomAccess = realImg.realRandomAccess();
-//
-//		double[] position = new double[ numDimensions ];
-//
-//		while(cursor.hasNext()){
-//			cursor.fwd();
-//
-//			for (int d = 0; d < numDimensions; ++d){
-//				position[d] = cursor.getDoublePosition(d)/img.realMax(d)*intervalSize[d] + interval.realMin(d); 
-//			}
-//
-//			realRandomAccess.setPosition(position);			
-//			cursor.get().set(realRandomAccess.get());
-//		}	
-//
-//		ImageJFunctions.show(img).setTitle("Another bead");
+		Cursor <T> cursor = Views.iterable(img).localizingCursor();
+		
+		while(cursor.hasNext()){
+			cursor.fwd();
+			
+			for (int d = 0; d < numDimensions; ++d){
+				position[d] = cursor.getDoublePosition(d)/img.realMax(d)*intervalSize[d] + interval.realMin(d); 
+			}
+			
+			// recalculate the value of psf 
+			double val = getPixelIntensity(parameters, position);
+			
+			cursor.get().setReal(val);			
+		}
 		
 		
+		
+		// ImageJFunctions.show(img).setTitle("generated bead");
 		
 	}
 	
-	public static void useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long typicalSigma, RandomAccessibleInterval<FloatType> psf){
+	public static double getPixelIntensity(double [] parameters, double[] position){
+		double res = 0;
+		
+		for (int d = 0; d < position.length; d++){
+			res += (position[d] - parameters[d])*(position[d] - parameters[d]);
+		}
+		
+		res *= (-parameters[4]);
+		res = Math.exp(res);
+		res *= parameters[3];
+		
+		return res;
+	}
+	
+	public static long useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long [] typicalSigma, RandomAccessibleInterval<FloatType> psf, RandomAccessibleInterval<FloatType> rPsf, GUIParams params){
+		
+		long numBeads = 0;
+		// long numBrokenBeads = 0;
+		
 		
 		int numDimensions = img.numDimensions();
 		
-		final GUIParams params = new GUIParams();
-		params.setDefaultValues(); 
-
-		// checked image beforehand
-		// TODO: either pass these values or set them here 
-		params.setSigmaDog(4);
-		params.setThresholdDoG(0.003f); 
-		params.setSupportRadius(2);
-		params.setMaxError(3);
-		params.setInlierRatio(0.9f);
-
 		ImagePlus imp = ImageJFunctions.wrap(img, "");
-
 
 		double [] calibration = HelperFunctions.initCalibration(imp, numDimensions); // new double[]{1, 1, 1};
 
 		RadialSymmetryParameters rsm = new RadialSymmetryParameters(params, calibration);
-
 		RadialSymmetry rs = new RadialSymmetry(rsm, img);
-
-		for (Spot spot : rs.getSpots()){
-			if (spot.numRemoved != spot.candidates.size()){
-				for (int d = 0; d < img.numDimensions(); ++d){
-					System.out.print(spot.getFloatPosition(d) + " ");
-				}
-				System.out.println();
-			}
-		}
 				
-		int hello = 0;
+		double [] realMin = new double[numDimensions];
+		double [] realMax = new double[numDimensions];
+		
 		for (Spot spot : rs.getSpots()){
 			if (spot.numRemoved != spot.candidates.size()){ // if the spot is not discarded
-				// TODO: take these variables out of the loop
 				double [] element = spot.getCenter();
-				double [] realMin = new double[numDimensions];
-				double [] realMax = new double[numDimensions];
-				
-//				for (int d = 0; d < numDimensions; ++d){
-//					element[d] += 0.5;
-//				}
-				
-				// x - radius + 0.5
-				
 				Utils.setRealMinMax(realMin, realMax, element, typicalSigma);
-				
 				FinalRealInterval realInterval = new FinalRealInterval( realMin, realMax ); 
+		
+				boolean isBroken = false;
+				for (int d = 0; d < numDimensions; d++) {
+					if (realMax[d] > img.max(d) || realMin[d] < img.min(d)){
+						isBroken = true;
+						// numBrokenBeads++;
+						break;
+					}
+				}
+					
+				// if the bead is alone in the cropped image
+				if (!isBroken) {
+					isBroken = !isAlone2(realMin, realMax, element, rs.getSpots(), numDimensions);
+					if (isBroken) {
+						// numBrokenBeads++;
+					}
+				}
 				
-				recalculateCoordinates(Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<FloatType>()), psf, realInterval);			
-				if (hello++ == 3) break;
+				if (!isBroken){
+					recalculateCoordinates(Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<FloatType>()), psf, realInterval);				
+					numBeads++;
+					
+					Utils.accumulateValues(psf, rPsf);
+				}
 			}
 		}
 		
-		// imp.show();
 		HelperFunctions.drawRealLocalizable( rs.getSpots(), imp, 2, Color.RED, false);
-
+		return numBeads; // - numBrokenBeads;
+		
 	}
 
 
 	// copies data from float grid to integer one
 	public static <T extends RealType<T>> void recalculateCoordinates(RealRandomAccessible<T> realImg, RandomAccessibleInterval<T> img, RealInterval interval){
 		int numDimensions = realImg.numDimensions();
-		// long[] pixelSize = new long[ numDimensions ];
 		double[] intervalSize = new double[numDimensions];
-		
-		// TODO: remove the magnification it is always one
-		// double magnification = 1.0; // this one can be deleted later
 
-		for (int d = 0; d < numDimensions; ++d){
+		for (int d = 0; d < numDimensions; ++d)
 			intervalSize[d] = interval.realMax(d) - interval.realMin(d);
-			// pixelSize[d] = Math.round(intervalSize[d]*magnification) + 1;
-		}
 
 		Cursor<T> cursor = Views.iterable(img).localizingCursor();
 		RealRandomAccess<T> realRandomAccess = realImg.realRandomAccess();
@@ -453,16 +501,15 @@ public class DeconvolutionTest {
 		while(cursor.hasNext()){
 			cursor.fwd();
 
-			for (int d = 0; d < numDimensions; ++d){
+			for (int d = 0; d < numDimensions; ++d)
 				position[d] = cursor.getDoublePosition(d)/img.realMax(d)*intervalSize[d] + interval.realMin(d); 
-			}
 
 			realRandomAccess.setPosition(position);			
 			cursor.get().set(realRandomAccess.get());
 		}	
 
-		ImageJFunctions.show(img).setTitle("Another bead");
-
+		// TODO: Comment out when done!
+		ImageJFunctions.wrap( img, "Another bead" ).duplicate().show();
 	}
 
 	// run for every second slice set to specific values
@@ -492,8 +539,8 @@ public class DeconvolutionTest {
 		// runExtractGeneratedBeads();
 
 
-		Run.runExtractBeads();
-		//Run.runRSExtractBeads();
+		//Run.runExtractBeads();
+		Run.runRSExtractBeads();
 
 		// runGaussianFitting();
 		// mainDeconvolutionSliced();

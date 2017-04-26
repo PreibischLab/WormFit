@@ -6,6 +6,7 @@ import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 // used for debug outputs 
@@ -23,7 +24,7 @@ public class Utils {
 			r.get().add(c.get());
 		}
 	}
-
+	
 	// this function copies data to psf
 	public static <T extends RealType<T>> void copyValues(RandomAccessibleInterval<T> img, RandomAccessibleInterval<T> psf) {
 		Cursor<T> c = Views.iterable(img).cursor();
@@ -154,6 +155,20 @@ public class Utils {
 		for (int d = 0; d < numDimensions; ++d){
 			min[d] = coord[d] - typicalSigma;
 			max[d] = coord[d] + typicalSigma;
+			if (debug)
+				System.out.println(min[d] + " : " + (coord[d]) + " : " + max[d]);
+			if ((max[d] - min[d]) % 2 == 1)
+				System.out.println("For coordinate d = " + d + ", the psf size is even!");
+		}
+	}
+	
+	public static void setRealMinMax( double [] min, double [] max, double[] coord, long [] typicalSigma){
+		int numDimensions = min.length;
+		if (debug)
+			System.out.println("Radius = " + typicalSigma);
+		for (int d = 0; d < numDimensions; ++d){
+			min[d] = coord[d] - typicalSigma[d];
+			max[d] = coord[d] + typicalSigma[d];
 			if (debug)
 				System.out.println(min[d] + " : " + (coord[d]) + " : " + max[d]);
 			if ((max[d] - min[d]) % 2 == 1)
