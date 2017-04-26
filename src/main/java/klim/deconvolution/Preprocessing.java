@@ -9,6 +9,8 @@ import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.real.FloatType;
 
 import ij.ImageJ;
+import ij.ImagePlus;
+import ij.io.FileSaver;
 import mpicbg.util.RealSum;
 import util.ImgLib2Util;
 
@@ -27,6 +29,9 @@ public class Preprocessing {
 		subtractImg(img, bg);	
 		
 		ImageJFunctions.show(img);
+		
+		// ImagePlus towrite = ImageJFunctions.wrap(img, "hi").duplicate();
+		// new FileSaver(towrite).saveAsTiffStack( "file.tif");
 	}
 		
 	public static void subtractValue(Img<FloatType> bg, double value){			
