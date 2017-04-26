@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import deconvolution.AdjustInput;
 import deconvolution.DeconvolveTest;
 import deconvolution.LucyRichardson;
+import ij.ImagePlus;
+import ij.io.FileSaver;
 import ij.process.ImageProcessor;
 import mpicbg.imglib.wrapper.ImgLib2;
 import klim.MedianFilter;
@@ -114,15 +116,15 @@ public class Run {
 		// long totalBeads = 0;		
 
 		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/";
-		String pathUbuntu = "/home/milkyklim/Desktop/beads_tifs/cropped/";
+		String pathUbuntu = "/home/milkyklim/Desktop/beads_tifs/cropped/preprocessed_median/";
 		// String fileName = "beads-bw-large.tif"; 
 
 		String path = pathUbuntu;
 		
-		String[] fileSeries = new String[]{ "3" }; //  , "11", "13", "14" 
+		String[] fileSeries = new String[]{ "3" , "11", "13", "14" }; // 
 		int nFiles = fileSeries.length;
 		
-		long [] psfSize = new long[]{151, 151, 117};
+		long [] psfSize = new long[]{171, 171, 97};
 		long [] psfHalfSize = new long[psfSize.length];
 		for(int d = 0; d < psfHalfSize.length; d++)
 			psfHalfSize[d] = psfSize[d]/2;
@@ -147,8 +149,8 @@ public class Run {
 		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(psfSize, new FloatType()); // local psf over one image and all beads there
 		for (int iFile = 0; iFile < nFiles; ++iFile){
 			Utils.setZero(psf);
-			Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "tif-" + fileSeries[iFile] + "-c.tif"));
-			
+			Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "tif-" + fileSeries[iFile] + "-c-m-p.tif"));
+			String fullPath = path + "beads/tif-" + fileSeries[iFile] + "-c-m-p-b"; // used to save the resulting beads
 			if (planeFit){
 				
 			}
@@ -160,7 +162,7 @@ public class Run {
 			// Img<FloatType> adjustedBeads = ImgLib2Util.openAs32Bit(new File(path + fileSeries[iFile]));	
 			Normalize.normalize(beads, new FloatType(0), new FloatType(1));
 				
-			long curNumBeads = DeconvolutionTest.useRadialSymmetry(beads, psfHalfSize, psf, rPsf, params);
+			long curNumBeads = DeconvolutionTest.useRadialSymmetry(beads, psfHalfSize, psf, rPsf, params, fullPath);
 			System.out.println("image: " + fileSeries[iFile] + " with " + curNumBeads + " beads");
 			
 			totalNumBeads += curNumBeads;
@@ -169,6 +171,8 @@ public class Run {
 		Utils.getAverageValue(rPsf, totalNumBeads);
 		ImageJFunctions.show(rPsf).setTitle("Averaged PSF");
 		
+		ImagePlus towrite = ImageJFunctions.wrap(psf, "bead").duplicate();
+		new FileSaver(towrite).saveAsTiffStack(path + "beads/averaged_bead.tif");
 		
 		// size of the beads should be the parameter
 		// long psfSizeXYZ = 15;

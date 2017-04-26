@@ -11,6 +11,7 @@ import gradient.Gradient;
 import gui.interactive.HelperFunctions;
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.io.FileSaver;
 import ij.measure.ResultsTable;
 import klim.ObjectSegmentation;
 import klim.Thresholding;
@@ -429,7 +430,7 @@ public class DeconvolutionTest {
 		return res;
 	}
 	
-	public static long useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long [] typicalSigma, RandomAccessibleInterval<FloatType> psf, RandomAccessibleInterval<FloatType> rPsf, GUIParams params){
+	public static long useRadialSymmetry(RandomAccessibleInterval<FloatType> img, long [] typicalSigma, RandomAccessibleInterval<FloatType> psf, RandomAccessibleInterval<FloatType> rPsf, GUIParams params, String fullPath){
 		
 		long numBeads = 0;
 		// long numBrokenBeads = 0;
@@ -475,11 +476,18 @@ public class DeconvolutionTest {
 					numBeads++;
 					
 					Utils.accumulateValues(psf, rPsf);
+					
+					// save the bead to the folder 
+					ImagePlus towrite = ImageJFunctions.wrap(psf, "bead").duplicate();
+					new FileSaver(towrite).saveAsTiffStack(fullPath + "-" + numBeads + ".tif");
+					
 				}
 			}
 		}
 		
-		HelperFunctions.drawRealLocalizable( rs.getSpots(), imp, 2, Color.RED, false);
+		
+		
+		// HelperFunctions.drawRealLocalizable( rs.getSpots(), imp, 2, Color.RED, false);
 		return numBeads; // - numBrokenBeads;
 		
 	}
