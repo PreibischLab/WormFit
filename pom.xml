@@ -108,24 +108,35 @@
 		</repository>
 	</repositories>
 
-<build>
-	<plugins>
-	    <plugin>
-	        <artifactId>maven-compiler-plugin</artifactId>
-	        <configuration>
-	            <source>1.8</source>
-	            <target>1.8</target>
-	        </configuration>
-	    </plugin>
-	    <plugin>
-	        <groupId>org.apache.maven.plugins</groupId>
-	        <artifactId>maven-ejb-plugin</artifactId>
-	        <configuration>
-	            <ejbVersion>3.0</ejbVersion>
-	        </configuration>
-	    </plugin>	    
-	</plugins>
-</build>
+	<build>
+		<plugins>
+	      <plugin>
+			  <groupId>org.apache.maven.plugins</groupId>
+			  <artifactId>maven-assembly-plugin</artifactId>
+			  <configuration>
+			    <archive>
+			      <manifest>
+			        <mainClass>klim.deconvolution.ClusterRun</mainClass>
+			      </manifest>
+			    </archive>
+			  </configuration>
+			</plugin>	
+		    <plugin>
+		        <artifactId>maven-compiler-plugin</artifactId>
+		        <configuration>
+		            <source>1.8</source>
+		            <target>1.8</target>
+		        </configuration>
+		    </plugin>
+		    <plugin>
+		        <groupId>org.apache.maven.plugins</groupId>
+		        <artifactId>maven-ejb-plugin</artifactId>
+		        <configuration>
+		            <ejbVersion>3.0</ejbVersion>
+		        </configuration>
+		    </plugin>	    
+		</plugins>
+	</build>
 
 	<packaging>ejb</packaging>
 </project>
