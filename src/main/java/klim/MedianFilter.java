@@ -171,7 +171,7 @@ public class MedianFilter
 		return portions;
 	}
 
-	/**
+	/*
 	 * call median filter with mirror single extension strategy
 	 * */
 	public static < T extends RealType<  T > & Comparable<T> > void medianFilter(
@@ -179,7 +179,7 @@ public class MedianFilter
 		medianFilter(Views.extendMirrorSingle(src), src, dst, kernelDim, numThreads, numTasks);
 	}
 
-	/**
+	/*
 	 * call median filter with the predefined # of threads and # of tasks
 	 * */
 	public static < T extends RealType<  T > & Comparable<T> > void medianFilter(
@@ -196,7 +196,10 @@ public class MedianFilter
 	 * @param infSrc -- extended image
 	 * @param srcInterval -- interval for the input
 	 * @param dst -- output image
-	 * @param kernelDim -- the size of the kernel in each dimension (should be *odd*) 
+	 * @param kernelDim -- the size of the kernel in each dimension (should be *odd*)
+	 * @param numThreads -- threads to use
+	 * @param numTasks -- how many chunks
+	 * @param <T> - the type
 	 * */
 	public static < T extends RealType<  T > & Comparable<T> > void medianFilter(
 			final RandomAccessible< T > infSrc, final Interval srcInterval, final RandomAccessibleInterval< T > dst, final int[] kernelDim, final int numThreads, final int numTasks){
@@ -233,7 +236,7 @@ public class MedianFilter
 		taskExecutor.shutdown();	
 	}
 
-	/**
+	/*
 	 * copy elements from the histogram to list 
 	 * */
 	public final static <T extends RealType<T> & Comparable<T>> void addAll(final IterableInterval<T> histogram, final List<T> list){
@@ -242,7 +245,7 @@ public class MedianFilter
 		Collections.sort(list);	
 	}
 
-	/**
+	/*
 	 * adjust the min/max values for the kernel
 	 * */
 	public final static void updateKernelMinMax(final long[] min, final long[] max, final long[] position, final int[] kernelHalfDim, int n){
@@ -252,7 +255,7 @@ public class MedianFilter
 		}
 	}
 
-	/**
+	/*
 	 *  add every element from histogram to the list
 	 */
 	public final static <T extends RealType<T> & Comparable<T>> void addElements(final RandomAccessibleInterval<T> histogram, final List<T> list){
@@ -294,7 +297,7 @@ public class MedianFilter
 			list.add(h.copy());
 	}
 
-	/**
+	/*
 	 *  remove elements from the list
 	 */
 	public final static <T extends RealType<T> & Comparable<T>> void removeElements(final RandomAccessibleInterval<T> histogram, final List<T> list){		
@@ -349,6 +352,7 @@ public class MedianFilter
 	 * @param src - input image
 	 * @param dst - final image
 	 * @param kernelDim - size of the kernel for median filter (2D)
+	 * @param <T> - the type
 	 */
 	public static <T extends RealType<T> & Comparable<T>> void medianFilterSliced(final RandomAccessibleInterval< T > src, final RandomAccessibleInterval< T > dst, final int[] kernelDim){
 		int zDim = 2;
@@ -359,7 +363,8 @@ public class MedianFilter
 	}
 	
 	/**
-	 * returns number of slices to process
+	 * @return number of slices to process
+	 * @param <T> - the type
 	 * @param img - image
 	 * */
 	public static <T extends RealType<T> & Comparable<T>> long getNumSlices(final RandomAccessibleInterval< T > img){

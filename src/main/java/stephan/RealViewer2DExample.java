@@ -53,8 +53,6 @@ import util.ImgLib2Util;
  * Adapted from MandelbrotRealViewer2DExample in imglib2-tutorials
  * 
  * @author spreibi
- *
- * @param <T>
  */
 public class RealViewer2DExample< T extends NumericType< T > & NativeType< T > >
 {

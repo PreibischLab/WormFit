@@ -24,11 +24,8 @@ import util.ImgLib2Util;
  */
 public class MeanFilter
 {
-	/**
+	/*
 	 * Compute the mean of an iterable interval
-	 * 
-	 * @param toFilter
-	 * @param result
 	 */
 	public static < T extends RealType<  T > > void filter( final IterableInterval< T > toFilter, final T result )
 	{
@@ -40,12 +37,8 @@ public class MeanFilter
 		result.mul( 1.0 / toFilter.size() );
 	}
 
-	/**
+	/*
 	 * filter the whole randomaccessible with a kernel defined by an interval
-	 * 
-	 * @param in
-	 * @param out
-	 * @param kernel
 	 */
 	public static < T extends RealType<  T > > void filterRect( final RandomAccessibleInterval< T > in, final RandomAccessibleInterval< T > out, final Interval kernel )
 	{
@@ -80,12 +73,8 @@ public class MeanFilter
 		}
 	}
 
-	/**
+	/*
 	 * filter the whole randomaccessible with a kernel defined by a sphere
-	 * 
-	 * @param in
-	 * @param out
-	 * @param kernel
 	 */
 	public static < T extends RealType<  T > > void filterCircle( final RandomAccessibleInterval< T > in, final RandomAccessibleInterval< T > out, final long radius )
 	{

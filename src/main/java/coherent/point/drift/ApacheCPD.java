@@ -209,6 +209,7 @@ public class ApacheCPD {
 	 * Calculate sigma<sup>2</sup>
 	 * @param mA - data points
 	 * @param mB - GMM centroids
+	 * @return sigma squared
 	 * */
 	protected double getSigma2(RealMatrix mA, RealMatrix mB){
 		int M = mB.getRowDimension();
@@ -244,7 +245,7 @@ public class ApacheCPD {
 
 	}
 
-	/**
+	/*
 	 * Compute the G matrix
 	 * */
 	protected void calculateG(RealMatrix Y, RealMatrix G, double beta){
@@ -258,7 +259,7 @@ public class ApacheCPD {
 		}
 	}
 
-	/**
+	/*
 	 * Update sigma <sup>2</sup> 
 	 * */
 	protected double updateSigma2(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix T){
@@ -292,7 +293,7 @@ public class ApacheCPD {
 
 	}
 
-	/**
+	/*
 	 * Calculate P for the non-rigid transformation
 	 * */
 	protected double calculatePnonRigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix W, RealMatrix G, double w_, double sigmaSq){
@@ -327,7 +328,7 @@ public class ApacheCPD {
 		System.out.println("Error: " + String.format(java.util.Locale.US, "%.2e", error));
 	}
 
-	/**
+	/*
 	 * use this method if you want to read data X, Y from file 
 	 * */
 	public int runNonRigidRegistration(int flag, String from, String to){
@@ -335,7 +336,7 @@ public class ApacheCPD {
 		return runNonRigidRegistration(flag);
 	}
 	
-	/**
+	/*
 	 * use this method if you already have data X, Y
 	 * */
 	public int runNonRigidRegistration(int flag, RealMatrix mX, RealMatrix mY){
@@ -419,7 +420,7 @@ public class ApacheCPD {
 		return error; 
 	}
 
-	/**
+	/*
 	 * use this method if you want to read data X, Y from file 
 	 * */
 	public int runAffineRegistration(int flag, String from, String to){
@@ -427,7 +428,7 @@ public class ApacheCPD {
 		return runAffineRegistration(flag);
 	}
 	
-	/**
+	/*
 	 * use this method if you already have data X, Y
 	 * */
 	public int runAffineRegistration(int flag, RealMatrix mX, RealMatrix mY){
@@ -505,7 +506,7 @@ public class ApacheCPD {
 		calculatePAR(X, Y, P, B, t, w_, sigmaSq);
 	}
 	
-	/**
+	/*
 	 * use this method if you want to read data X, Y from file 
 	 * */
 	public int runRigidRegistration(int flag, String from, String to){
@@ -513,7 +514,7 @@ public class ApacheCPD {
 		return runRigidRegistration(flag);
 	}
 	
-	/**
+	/*
 	 * use this method if you already have data X, Y
 	 * */
 	public int runRigidRegistration(int flag, RealMatrix mX, RealMatrix mY){
@@ -674,7 +675,7 @@ public class ApacheCPD {
 
 	}
 
-	/**
+	/*
 	 * Shows coordinates defined by A in the imp image
 	 * 
 	 */

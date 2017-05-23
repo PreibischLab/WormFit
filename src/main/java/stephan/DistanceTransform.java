@@ -116,6 +116,7 @@ public class DistanceTransform
 	 * 
 	 * @param in - binary image
 	 * @param out - distances to the closest 1 from any 0
+	 * @param <T> - the type
 	 */
 	public static < T extends RealType< T > > void distanceTransformKD( final IterableInterval< BitType > in, final RandomAccessibleInterval< T > out )
 	{

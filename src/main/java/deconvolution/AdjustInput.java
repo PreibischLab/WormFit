@@ -127,11 +127,8 @@ public class AdjustInput
 		return avg;
 	}
 
-	/**
+	/*
 	 * Adds additive gaussian noise: i = i + gauss(x, sigma)
-	 * 
-	 * @param amount - how many times sigma
-	 * @return the signal-to-noise ratio (measured)
 	 */
 	public static double addGaussianNoise( final Image< FloatType > img, final Random rnd, final float sigma, boolean onlyPositive )
 	{
@@ -175,11 +172,8 @@ public class AdjustInput
 		return Math.sqrt( stDev );
 	}
 
-	/**
+	/*
 	 * Adds additive and multiplicative gaussian noise: i = i*gauss(x,sigma) + gauss(x, sigma)
-	 * 
-	 * @param amount - how many times sigma
-	 * @return the signal-to-noise ratio (measured)
 	 */
 	public static double addGaussianNoiseAddMul( final Image< FloatType > img, final Random rnd, final float sigma, boolean onlyPositive )
 	{
@@ -297,8 +291,9 @@ public class AdjustInput
 
 	/**
 	 * 
-	 * @param img
+	 * @param img - image to add it to
 	 * @param percentdeadpixels - number of dead pixels in percent
+	 * @param minValue - minvalue of the image
 	 */
 	public static void addDeadPixels( final Image<FloatType> img, final float percentdeadpixels, final float minValue )
 	{

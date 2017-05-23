@@ -262,9 +262,9 @@ public class LucyRichardson
 	/**
 	 * psi is 1/2 psf [int] * 2 bigger in all dimensions
 	 * 
-	 * @param observed
-	 * @param psf
-	 * @return
+	 * @param observed - the observed image
+	 * @param psf - the psf
+	 * @return the initial image
 	 */
 	protected static Image< FloatType > createPSI( final Image< FloatType > observed, final Image< FloatType > psf )
 	{

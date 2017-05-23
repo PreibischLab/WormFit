@@ -137,7 +137,7 @@ public class CoherentPointDrift {
 		normalize(mY);
 	}
 
-	/**
+	/*
 	 * Shows coordinates defined by A in the imp image
 	 * 
 	 */
