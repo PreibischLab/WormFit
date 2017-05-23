@@ -111,27 +111,6 @@ public class Utils {
 		return Views.interval(img, min, max);
 	}
 	
-	// set the minimal and maximal 
-	// TODO: this function is full of hacks and tricks to adjust the size of the interval
-	// TODO: DELETE WOTH THIE NEXT COMMIT  
-	public static void setMinMax(long[] min, long[] max, double[] parameters){
-		int numDimensions = min.length;
-
-		// adjust the last parameter so that it is the radius now
-		// b = 1/(2 sigma^2) 
-		long b = Math.round(Math.sqrt(1/(2*parameters[parameters.length - 1]))); // parameters.get(parameters.indexOf(element))[element.length - 1];
-		// System.out.println("b = " + b);
-		for (int d = 0; d < numDimensions; ++d){
-			// TODO: the peak intensity should be in the center of the picture !
-			min[d] = (long)Math.floor(parameters[d] - 1 - b);
-			max[d] = (long)Math.ceil(parameters[d] + b);
-			System.out.println(min[d] + " : " + (parameters[d]) + " : " + max[d]);
-			// System.out.println(min[d] + " : " + max[d]);
-			if ((max[d] - min[d]) % 2 == 1)
-				System.out.println("for coordinate d = " + d + ", the psf size is even!");
-		}
-	}
-	
 	public static void setRealMinMax( double [] min, double [] max, double[] parameters){
 		int numDimensions = min.length;
 		// b = 1/(2 sigma^2) 
@@ -169,6 +148,20 @@ public class Utils {
 		for (int d = 0; d < numDimensions; ++d){
 			min[d] = coord[d] - typicalSigma[d];
 			max[d] = coord[d] + typicalSigma[d];
+			if (debug)
+				System.out.println(min[d] + " : " + (coord[d]) + " : " + max[d]);
+			if ((max[d] - min[d]) % 2 == 1)
+				System.out.println("For coordinate d = " + d + ", the psf size is even!");
+		}
+	}
+	
+	public static void setMinMax( long [] min, long [] max, double[] coord, long [] typicalSigma){
+		int numDimensions = min.length;
+		if (debug)
+			System.out.println("Radius = " + typicalSigma);
+		for (int d = 0; d < numDimensions; ++d){
+			min[d] = (long) (coord[d] - typicalSigma[d]);
+			max[d] = (long) (coord[d] + typicalSigma[d]);
 			if (debug)
 				System.out.println(min[d] + " : " + (coord[d]) + " : " + max[d]);
 			if ((max[d] - min[d]) % 2 == 1)
