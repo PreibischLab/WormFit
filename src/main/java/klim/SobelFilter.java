@@ -352,10 +352,9 @@ public class SobelFilter {
 
 	// process the worm and return the distance transform of it 
 	// fix the declaration
-	public static <T extends RealType<T> & NativeType<T>, U extends RealType<U>> void processWorm(RandomAccessibleInterval<T> initialImg, RandomAccessibleInterval<T> filterImg, RandomAccessibleInterval<T> edgeImg, RandomAccessibleInterval<BitType> thresholdImg, Img <T> distanceImg,
-			T minValue, T maxValue,
-			T tVal,
-			U minVal, U maxVal,
+	public static void processWorm(RandomAccessibleInterval<FloatType> initialImg, RandomAccessibleInterval<FloatType> filterImg, RandomAccessibleInterval<FloatType> edgeImg, RandomAccessibleInterval<BitType> thresholdImg, Img <FloatType> distanceImg,
+			FloatType minValue, FloatType maxValue,
+			FloatType tVal,
 			PointSampleList<BitType> wormOutline
 			) throws IncompatibleTypeException{		
 
@@ -369,11 +368,11 @@ public class SobelFilter {
 		// System.out.println("Median filter: done!");
 
 
-		Img<T> kernel = (Img<T>) setKernel(n, 0);
+		Img<FloatType> kernel = setKernel(n, 0);
 
-		final Img<T> edgeTmpImg = new ArrayImgFactory<T>().create(edgeImg, minValue);
+		final Img<FloatType> edgeTmpImg = new ArrayImgFactory<FloatType>().create(edgeImg, minValue);
 
-		applySobelFilter(filterImg, edgeTmpImg, kernel, minValue, maxValue, new ArrayImgFactory<T>());
+		applySobelFilter(filterImg, edgeTmpImg, kernel, minValue, maxValue, new ArrayImgFactory<FloatType>());
 		System.out.println("Sobel filter: done!");
 		if (debug){
 			ImageJFunctions.show(filterImg).setTitle("DEBUG: filterImg: in function");	
@@ -398,8 +397,8 @@ public class SobelFilter {
 
 
 
-		kernel = (Img<T>) setKernel(n, 1);
-		applySobelFilter(edgeTmpImg, edgeImg, kernel, minValue, maxValue, new ArrayImgFactory<T>());
+		kernel = setKernel(n, 1);
+		applySobelFilter(edgeTmpImg, edgeImg, kernel, minValue, maxValue, new ArrayImgFactory<FloatType>());
 		System.out.println("Sobel filter: done!");
 		ImageJFunctions.show(edgeImg).setTitle("edgeImg: in function");
 
@@ -412,8 +411,8 @@ public class SobelFilter {
 		if (debug)
 			ImageJFunctions.show(labeling.getIndexImg()).setTitle("DEBUG: labeling: in function");
 
-		PointSampleList<T> worm = new PointSampleList<T>(initialImg.numDimensions());
-		BoundingBox.setPointSampleList(labeling, (RandomAccessible<T>)initialImg, worm);
+		PointSampleList<FloatType> worm = new PointSampleList<FloatType>(initialImg.numDimensions());
+		BoundingBox.setPointSampleList(labeling, (RandomAccessible<FloatType>)initialImg, worm);
 		Thresholding.threshold(edgeImg, thresholdImg, tVal);
 		System.out.println("Thresholding: done!");
 
@@ -525,7 +524,7 @@ public class SobelFilter {
 			PointSampleList<BitType> wormOutline = new PointSampleList<BitType>(initialImg.numDimensions());
 			processWorm(preprocessedImg, filterImg, edgeImg, thresholdImg, distanceImg,
 					new FloatType((float) 0), new FloatType((float) 255), new FloatType((float) 110.0), // 52
-					new BitType(false), new BitType(true), wormOutline);
+					wormOutline);
 
 			if (showImage){
 				ImageJFunctions.show(initialImg).setTitle("initialImg");
