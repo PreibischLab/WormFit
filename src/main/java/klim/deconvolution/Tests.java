@@ -54,7 +54,7 @@ public class Tests {
 			// here comes the interpolation check
 			RealRandomAccessible<FloatType> realImg = Views.interpolate( Views.extendMirrorSingle(img), new NLinearInterpolatorFactory<FloatType>());
 			// TODO: check if this one is necessary
-			Utils.setMinMax(min, max, element);
+			Utils.setMinMax(min, max, element, new long[]{7, 5, 9});
 			FinalInterval interval = new FinalInterval( min, max );
 
 			RandomAccessibleInterval <FloatType> realImgToInt = Views.interval(Views.raster(realImg), interval);

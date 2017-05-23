@@ -60,6 +60,6 @@ public class PreProcessImage
 		//ImageJFunctions.show( cropConvolvedDros( convImg ) ).setTitle( "input" );
 		//ImageJFunctions.show( psf ).setTitle( "psf" );
 
-		DeconvolveTest.deconvolve( DeconvolveTest.createInput( ( convImg ), psf ) );
+		DeconvolveTest.deconvolve( DeconvolveTest.createInput( ( convImg ), psf ), 0, "test" );
 	}
 }
