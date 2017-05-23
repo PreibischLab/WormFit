@@ -36,7 +36,8 @@ public class Run {
 
 		Utils.thresholdNoise(img, new FloatType(10.0f));
 
-		DeconvolutionTest.gaussianFitting(img, out, new FloatType(tVal));
+		final ArrayList<double[]> results = new ArrayList<>();
+		DeconvolutionTest.gaussianFitting(img, out, new FloatType(tVal), results );
 
 		// ImageJFunctions.show(psf);
 	}
@@ -107,7 +108,7 @@ public class Run {
 	}
 	
 
-	
+
 	public static void runRSExtractBeads(){
 		
 		// use plane fitting 
@@ -116,15 +117,15 @@ public class Run {
 		// long totalBeads = 0;		
 
 		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/";
-		String pathUbuntu = "/home/milkyklim/Desktop/beads_tifs/cropped/preprocessed_median/";
+		String pathUbuntu = "/home/milkyklim/Desktop/2017-04-27-beads/";
 		// String fileName = "beads-bw-large.tif"; 
 
 		String path = pathUbuntu;
 		
-		String[] fileSeries = new String[]{ "3" , "11", "13", "14" }; // 
-		int nFiles = fileSeries.length;
+		// String[] fileSeries = new String[]{ "3" , "11", "13", "14" }; // 
+		int nFiles = 17; // fileSeries.length;
 		
-		long [] psfSize = new long[]{171, 171, 97};
+		long [] psfSize = new long[]{211, 211, 97};
 		long [] psfHalfSize = new long[psfSize.length];
 		for(int d = 0; d < psfHalfSize.length; d++)
 			psfHalfSize[d] = psfSize[d]/2;
@@ -147,10 +148,15 @@ public class Run {
 				
 		long totalNumBeads = 0;
 		Img<FloatType> psf = new ArrayImgFactory<FloatType>().create(psfSize, new FloatType()); // local psf over one image and all beads there
-		for (int iFile = 0; iFile < nFiles; ++iFile){
+		for (int iFile = 1; iFile <= nFiles; ++iFile){
+			
+			// hack for broken beads
+			if (iFile == 14 || iFile == 17 || iFile == 15)
+				continue;
+			
 			Utils.setZero(psf);
-			Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "tif-" + fileSeries[iFile] + "-c-m-p.tif"));
-			String fullPath = path + "beads/tif-" + fileSeries[iFile] + "-c-m-p-b"; // used to save the resulting beads
+			Img<FloatType> beads = ImgLib2Util.openAs32Bit(new File(path + "processed/tif-" + iFile + "-c-m-p.tif"));
+			String fullPath = path + "beads/tif-" + iFile + "-c-m-p-b"; // used to save the resulting beads
 			if (planeFit){
 				
 			}
@@ -163,7 +169,7 @@ public class Run {
 			Normalize.normalize(beads, new FloatType(0), new FloatType(1));
 				
 			long curNumBeads = DeconvolutionTest.useRadialSymmetry(beads, psfHalfSize, psf, rPsf, params, fullPath);
-			System.out.println("image: " + fileSeries[iFile] + " with " + curNumBeads + " beads");
+			System.out.println("image: " + iFile + " with " + curNumBeads + " beads");
 			
 			totalNumBeads += curNumBeads;
 		}
@@ -224,6 +230,11 @@ public class Run {
 	
 	// MAIN FUNCTION! run deconvolution
 	public static <T extends FloatType> void runDeconvolution(Img<FloatType> img, Img<FloatType> psf) {
+		runDeconvolution(img, psf, 0, "");		
+	}
+	
+	// MAIN FUNCTION! run deconvolution
+	public static <T extends FloatType> void runDeconvolution(Img<FloatType> img, Img<FloatType> psf, float reg, String filename) {
 		for ( FloatType t : img )
 			t.add( new FloatType( 1 ));
 		AdjustInput.adjustImage(ImgLib2.wrapFloatToImgLib1(img), LucyRichardson.minValue, 1);
@@ -233,10 +244,63 @@ public class Run {
 		AdjustInput.normImage(ImgLib2.wrapFloatToImgLib1(psf));
 		System.out.println("after: " + Utils.sumIntensities(psf));
 
-		ImageJFunctions.show(psf).setTitle("normalized psf");
-		ImageJFunctions.show(img).setTitle("adjusted image");
+		// offline mode
+		// ImageJFunctions.show(psf).setTitle("normalized psf");
+		// ImageJFunctions.show(img).setTitle("adjusted image");
 
-		DeconvolveTest.deconvolve(DeconvolveTest.createInput((img), psf));
+		DeconvolveTest.deconvolve(DeconvolveTest.createInput((img), psf), reg, filename);
 	}
+	
+	
+	
+	public static void runDeconvolutionBatch(){
+		// 2 different PSF's 
+		// with regularization and without one 
+		
+		String[] psfFiles = new String[]{"psf-0024"};
+		float [] regularization = new float[]{0, 0.0006f};
+		
+		String path = "/home/milkyklim/Desktop/";
+				
+		for (int j = 1; j <= 2; j++){
+			for (int r = 0; r < regularization.length; r++){
+				// read img and psf
+				Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "2017-04-27-beads/img-" + j + ".tif"));
+				Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "2017-04-27-beads/psf/" + psfFiles[0] + ".tif"));
+								
+				
+				String resultPath = path + "2017-04-27-beads/result/" + "img-" + j + "/" + "out-" + regularization[r] + "-";
+				
+				
+				runDeconvolution(img, psf, regularization[r], resultPath);
+			}
+		}
+		
+	} 
+	
+	public static void runDeconvolutionMultipleImages(){
+		String[] psfFiles = new String[]{"psf"};
+		String folderPath = "/home/milkyklim/Desktop/2017-04-29_smFISH-DAPI-deconvolution"; // /2017-04-29_smFISH-DAPI
+		
+		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(folderPath + "/psf.tif"));
+		
+		int totalFiles = 40;
+		for (int idx = 1; idx <= totalFiles; idx++){
+			String inputFile  = folderPath + "/2017-04-29_smFISH-DAPI/" + "N2-DPY23-wdr-5.2-" + String.format("%03d", idx) + "_C2";
+			String outputFile = folderPath + "/2017-04-29_smFISH-DAPI-result/" + "N2-DPY23-wdr-5.2-" + String.format("%03d", idx) + "_C2";
+			
+			Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(inputFile + ".tif"));
+			runDeconvolution(img, psf, 0, outputFile);
+			
+		} 
+		
+		
+	}
+	
+	public static void main(String [] args){
+		runDeconvolutionMultipleImages();
+		System.out.println("Doge!");
+	}
+	
 	
 }
