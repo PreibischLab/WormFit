@@ -15,12 +15,9 @@ import mpicbg.util.RealSum;
 import util.ImgLib2Util;
 
 public class Preprocessing {
-	public static void preprocessImage(){
-		new ImageJ();
-		String path = "";
-		String file = "";
-		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File("/Volumes/Samsung_T3/2017-04-25-beads/cropped/tif-14-c.tif"));//path + file + ".tif"));
-		Img<FloatType> bg  = ImgLib2Util.openAs32Bit(new File("/Volumes/Samsung_T3/2017-04-25-beads/cropped/bg/tif-14-c-m.tif"));//path + "bg/" + file + "-m.tif"));
+	public static void preprocessImage(String path, int i){
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "/unprocessed/tif-" + i + "-c.tif"));//path + file + ".tif"));
+		Img<FloatType> bg  = ImgLib2Util.openAs32Bit(new File(path + "/bg/tif-" + i + "-c-m.tif"));//path + "bg/" + file + "-m.tif"));
 		
 		double average = getImageAverage(bg);	
 		System.out.println(average);
@@ -28,11 +25,24 @@ public class Preprocessing {
 		subtractValue(bg, average);
 		subtractImg(img, bg);	
 		
-		ImageJFunctions.show(img);
+		// ImageJFunctions.show(img);
 		
-		// ImagePlus towrite = ImageJFunctions.wrap(img, "hi").duplicate();
-		// new FileSaver(towrite).saveAsTiffStack( "file.tif");
+		ImagePlus toWrite = ImageJFunctions.wrap(img, "").duplicate();
+		new FileSaver(toWrite).saveAsTiffStack(path + "/processed/tif-" + i + "-c-m-p.tif");
 	}
+	
+	
+	public static void batchProcess(){
+		new ImageJ();
+		String path = "/home/milkyklim/Desktop/2017-04-27-beads";		
+		int numFiles = 17;
+		
+		for (int i = 1; i <= numFiles; ++i){
+			preprocessImage(path, i);
+			System.out.println("image " + i + " processed!");
+		}				
+	}
+	
 		
 	public static void subtractValue(Img<FloatType> bg, double value){			
 		Cursor<FloatType> cursor = bg.cursor();
@@ -40,6 +50,16 @@ public class Preprocessing {
 		while(cursor.hasNext()){
 			cursor.fwd();
 			float val = (float) (cursor.get().get() - value);
+			cursor.get().set(val);
+		}
+	}
+	
+	// subtract value and cut negative values
+	public static void subtractValueNonNegative(Img<FloatType> img, double value){			
+		Cursor<FloatType> cursor = img.cursor();		
+		while(cursor.hasNext()){
+			cursor.fwd();
+			float val = Math.max((float) (cursor.get().get() - value), 0);
 			cursor.get().set(val);
 		}
 	}
@@ -73,7 +93,14 @@ public class Preprocessing {
 	}
 	
 	public static void main(String [] args){
-		preprocessImage();
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File("/home/milkyklim/Desktop/2017-04-27-beads/beads/averaged_bead.tif"));//path + file + ".tif"));
+		subtractValueNonNegative(img,  0.024);
+		
+		ImagePlus toWrite = ImageJFunctions.wrap(img, "").duplicate();
+		new FileSaver(toWrite).saveAsTiffStack("/home/milkyklim/Desktop/2017-04-27-beads/beads/averaged_bead_done.tif");
+		
+		// batchProcess();		
+		System.out.println("DOGE!");
 	}
 	
 }
