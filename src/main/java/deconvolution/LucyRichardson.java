@@ -185,7 +185,7 @@ public class LucyRichardson
 		randomAccess.close();
 		cursorPsiBlurred.close();
 
-		if ( debug || iteration == 0 )
+		if ( debug ) // || iteration == 0 )
 			ImageJFunctions.show( psiBlurred.clone() ).setTitle( "ratio_" + iteration );
 
 		//
