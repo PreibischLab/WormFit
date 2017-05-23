@@ -2,7 +2,9 @@ package deconvolution;
 
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.io.FileSaver;
 import klim.deconvolution.DeconvolutionTest;
+import klim.deconvolution.Utils;
 
 import java.util.Date;
 
@@ -21,9 +23,9 @@ public class DeconvolveTest
 		return new LRFFT_Test( ImgLib2.wrapFloatToImgLib1( im.copy() ), ImgLib2.wrapFloatToImgLib1( psf.copy() ) );
 	}
 
-	public static void deconvolve( final LRFFT_Test deconvolutionData )
+	public static void deconvolve( final LRFFT_Test deconvolutionData, float lambda, String filename)
 	{
-		final LucyRichardson d = new LucyRichardson( deconvolutionData, 1.0e-4 );
+		final LucyRichardson d = new LucyRichardson( deconvolutionData, lambda);
 
 		// will be used to show the result
 		ImageStack stack = null;
@@ -35,14 +37,14 @@ public class DeconvolveTest
 		double ratio = totalEnergy/currentEnergy;
 
 		// number of deconvolve iterations
-		for ( int i = 0; i < 200; ++ i )
+		int maxIter = 500;
+		for ( int i = 0; i < maxIter; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
 
-			// every, every 10th and every 100th 
-			
-			if ( i < 10 || ( i < 100 && i % 10 == 0 ) || ( i >= 100 && i % 100 == 0 ) )
+			// 50, 100, 200, 300, 500 
+			if (/* i == 50 || i == 100 || i == 200 || i == 300 || */ i ==  (maxIter - 1) )
 			{
 				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() );
 	
@@ -54,20 +56,25 @@ public class DeconvolveTest
 				stack.addSlice( "iteration_"  + i, imp.getProcessor());
 			}
 			
-			if ( i == 500 )
+			if ( i == maxIter - 1 )
 			{
-				ImagePlus impStack = new ImagePlus( "decon", stack );
-				impStack.show();
+				// ImagePlus impStack = new ImagePlus( "decon", stack ).duplicate();
+				// new FileSaver(impStack).saveAsTiffStack(filename + ".tif");
+				
+				// impStack.show();
 				// impStack.setRoi(15,39,615,274);
 			}
 			
 			
-			if ( i > 0 && ( i == 10 ||  i == 50 || i % 99 == 0 ) )
+			if ( i == 10 /* || i == 50 || i == 100 || i == 200 || i == 300 */ ||  i == (maxIter - 1)  )
 			{
-				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() );
-				imp.setTitle( "it=" + i );
-				imp.resetDisplayRange();
-				imp.show();
+				ImagePlus imp = ImageJFunctions.copyToImagePlus( d.getPsi() ).duplicate();
+				
+				new FileSaver(imp).saveAsTiffStack(filename + "it=" + i + ".tif");
+				
+				// imp.setTitle( "it=" + i );
+				// imp.resetDisplayRange();
+				// imp.show();
 			}					
 		}
 		
@@ -75,14 +82,14 @@ public class DeconvolveTest
 		// impStack.show();
 		// impStack.setRoi(15,39,615,274);
 		
-		System.out.println("image before: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+		System.out.println("image before: " + Utils.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		currentEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
 		ratio = totalEnergy/currentEnergy;
 		
 		// adjust the Image intensities so that they sum up to 1
 		AdjustInput.adjustImage(d.getPsi(), ratio);
-		System.out.println("image after : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+		System.out.println("image after : " + Utils.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		
-		ImageJFunctions.show( d.getPsi() );
+		// ImageJFunctions.show( d.getPsi() );
 	}
 }
