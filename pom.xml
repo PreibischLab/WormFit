@@ -12,7 +12,7 @@
 	<name>Software for segmentation and analysis of smFISH worm images</name>
 
 	<dependencies>
-		<dependency>
+<!-- 		<dependency>
 			<groupId>com.opencsv</groupId>
 			<artifactId>opencsv</artifactId>
 			<version>3.7</version>
@@ -21,7 +21,7 @@
 			<groupId>org.la4j</groupId>
 			<artifactId>la4j</artifactId>
 			<version>0.6.0</version>
-		</dependency>
+		</dependency> -->
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2</artifactId>
@@ -45,7 +45,6 @@
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-algorithm</artifactId>
-			<version>0.5.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
@@ -75,7 +74,6 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
-			<version>5.0.5-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
@@ -88,8 +86,9 @@
 		<repository>
 			<id>imagej.public</id>
 			<url>http://maven.imagej.net/content/groups/public</url>
+			
 		</repository>
 	</repositories>
-
+	
 	<packaging>ejb</packaging>
 </project>
