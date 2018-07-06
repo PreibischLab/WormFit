@@ -435,11 +435,11 @@ public class ApacheCPD {
 //		return 0;
 //	}
 
-	public void computePrigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix R, double s, RealVector t, double w_, double sigmaSq){
+	protected void computePrigid(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix R, double s, RealVector t, double w_, double sigmaSq){
 		calculatePAR(X, Y, P, R.scalarMultiply(s), t, w_, sigmaSq);
 	}
 
-	public void computePaffine(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix B, RealVector t, double w_, double sigmaSq){
+	protected void computePaffine(RealMatrix X, RealMatrix Y, RealMatrix P, RealMatrix B, RealVector t, double w_, double sigmaSq){
 		calculatePAR(X, Y, P, B, t, w_, sigmaSq);
 	}
 
