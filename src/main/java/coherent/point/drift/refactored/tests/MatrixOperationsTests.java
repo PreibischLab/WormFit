@@ -47,7 +47,6 @@ public class MatrixOperationsTests {
 		return MatrixUtils.createRealMatrix(mA);
 	}
 	
-	//FIXME: TEST
 	public static void testNormalize(){
 		RealMatrix matrix = MatrixUtils.createRealMatrix(3, 3);
 		

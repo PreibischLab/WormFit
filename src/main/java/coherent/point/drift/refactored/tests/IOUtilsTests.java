@@ -7,6 +7,8 @@ import coherent.point.drift.refactored.IOUtils;
 
 public class IOUtilsTests {
 	
+	private static double eps = 1e-8;
+	
 	public static void testGetNumLines() {
 		String filepath = "/Users/kkolyva/workspace/WormFit/src/main/resources/coherent-point-drift-tests/coordinates-3D.csv";
 		char delimiter = '\t';
@@ -46,7 +48,7 @@ public class IOUtilsTests {
 		
 		RealMatrix foundMatrix = IOUtils.readPositionsFromCSV(filepath, delimiter);
 		
-		if (realMatrix.subtract(foundMatrix).getNorm() > 1e-8)
+		if (realMatrix.subtract(foundMatrix).getNorm() > eps)
 			throw new RuntimeException(String.format("IOUtils.readPositionsFromCSV is not working properly; Norm is too high: %f", realMatrix.subtract(foundMatrix).getNorm()));
 		
 		System.out.println("IOUtils.readPositionsFromCSV works fine");
@@ -66,7 +68,7 @@ public class IOUtilsTests {
 		IOUtils.writePositionsToCSV(realMatrix, filepath, delimiter);
 		RealMatrix foundMatrix = IOUtils.readPositionsFromCSV(filepath, delimiter);
 		
-		if (realMatrix.subtract(foundMatrix).getNorm() > 1e-8)
+		if (realMatrix.subtract(foundMatrix).getNorm() > eps)
 			throw new RuntimeException(String.format("IOUtils.writePositionsToCSV is not working properly; Norm is too high: %f", realMatrix.subtract(foundMatrix).getNorm()));
 		
 		System.out.println("IOUtils.writePositionsToCSV works fine");
