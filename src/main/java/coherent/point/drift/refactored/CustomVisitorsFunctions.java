@@ -20,7 +20,7 @@ public class CustomVisitorsFunctions {
 		}
 
 		public double visit(int row, int col, double val){
-			return val/scale; // val/scaleValue;
+			return val/scale;
 		}
 
 		public double end(){
@@ -60,7 +60,7 @@ public class CustomVisitorsFunctions {
 
 		public void start (int rows, int columns,
 				int startRow, int endRow, int startColumn, int endColumn){
-
+			// empty
 		}
 
 		public void visit(int row, int col, double val){

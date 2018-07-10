@@ -1,6 +1,9 @@
-package coherent.point.drift.refactored;
+package coherent.point.drift.refactored.tests;
 
 import org.apache.commons.math3.linear.RealMatrix;
+
+import coherent.point.drift.refactored.ApacheCPD;
+import coherent.point.drift.refactored.utils.IOUtils;
 
 public class ApacheCPDTests {
 	

@@ -15,6 +15,7 @@ import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSquareSumVi
 import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSubtractValueVisitor;
 import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSumVisitor;
 import coherent.point.drift.refactored.CustomVisitorsFunctions.MatrixSumElementsVisitor;
+import coherent.point.drift.refactored.utils.Utils;
 
 public class ApacheCPD {
 	// coherent point drift parameters
@@ -26,14 +27,6 @@ public class ApacheCPD {
 	final RealMatrix mX; // NxD
 	final RealMatrix mY; // MxD
 
-	// TODO: mov these away; it can be local
-	// final RealMatrix mW; // MxD
-	// final RealMatrix mG; // MxM
-	// final RealMatrix mP; // MxN
-	// final RealMatrix mT; // MxD transformation matrix
-
-	// TODO: check if you ever use them. otherwise, delete
-	// this params should never be changed after reading the files or creating the matrices
 	private final int numDimensions; // dimensionality of the point set
 	private final int numSpotsSample; // # of points in the first point set
 	private final int numSpotsLineage; // # of points in the second point set

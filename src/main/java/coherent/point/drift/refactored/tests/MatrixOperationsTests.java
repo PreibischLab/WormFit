@@ -4,8 +4,8 @@ import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 
 import coherent.point.drift.refactored.ApacheCPD;
-import coherent.point.drift.refactored.IOUtils;
-import coherent.point.drift.refactored.Utils;
+import coherent.point.drift.refactored.utils.IOUtils;
+import coherent.point.drift.refactored.utils.Utils;
 
 public class MatrixOperationsTests {
 	
