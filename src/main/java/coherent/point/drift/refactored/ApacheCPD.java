@@ -1,44 +1,18 @@
 package coherent.point.drift.refactored;
 
-import java.awt.Color;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-
-import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.DecompositionSolver;
 import org.apache.commons.math3.linear.DiagonalMatrix;
-import org.apache.commons.math3.linear.LUDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.QRDecomposition;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.linear.RealMatrixChangingVisitor;
-import org.apache.commons.math3.linear.RealMatrixPreservingVisitor;
 import org.apache.commons.math3.linear.RealVector;
-import org.apache.commons.math3.linear.SingularValueDecomposition;
-// import org.la4j.Matrix;
 
+import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnDivideVisitor;
+import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSquareSumVisitor;
 import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSubtractValueVisitor;
 import coherent.point.drift.refactored.CustomVisitorsFunctions.ColumnSumVisitor;
 import coherent.point.drift.refactored.CustomVisitorsFunctions.MatrixSumElementsVisitor;
-import ij.ImageJ;
-import ij.ImagePlus;
-import ij.gui.OvalRoi;
-import ij.gui.Overlay;
-import mpicbg.imglib.util.Util;
-import net.imglib2.Cursor;
-import net.imglib2.IterableInterval;
-import net.imglib2.RandomAccessible;
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.Img;
-import net.imglib2.img.array.ArrayImgFactory;
-import net.imglib2.img.display.imagej.ImageJFunctions;
-import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.view.Views;
-import util.opencsv.CSVReader;
-import util.opencsv.CSVWriter;
 
 public class ApacheCPD {
 	// coherent point drift parameters
@@ -92,12 +66,12 @@ public class ApacheCPD {
 	 * Normalization of the matrix so that the mean = 0 and standard deviation = 1
 	 * @param mA - matrix to normalize
 	 * */
-	protected static void normalize(RealMatrix mA){
+	public static RealMatrix normalize(RealMatrix mA){
 		int numColumns = mA.getColumnDimension();
 		int numRows = mA.getRowDimension();
 
 		double [] sumOverColumns = new double [numColumns];
-		// zero mean
+		// zero mean => per coordinate!
 		for (int d = 0; d < numColumns; ++d)
 			sumOverColumns[d]= 0;
 
@@ -105,25 +79,43 @@ public class ApacheCPD {
 		columnSumVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
 		mA.walkInOptimizedOrder(columnSumVisitor);
 		columnSumVisitor.end();
-
-		for(int d = 0; d < numColumns; ++d)		
+		
+		for(int d = 0; d < numColumns; ++d)
 			sumOverColumns[d] /= numRows;
 
 		ColumnSubtractValueVisitor columnSubtractValueVisitor = new CustomVisitorsFunctions().new ColumnSubtractValueVisitor(sumOverColumns);
 		columnSubtractValueVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
 		mA.walkInOptimizedOrder(columnSubtractValueVisitor);
 		columnSubtractValueVisitor.end();
-
+		
 		// std = 1
-		MatrixSumElementsVisitor matrixSumSquaredElementsVisitor = new CustomVisitorsFunctions().new MatrixSumElementsVisitor(1);
-		matrixSumSquaredElementsVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
-		mA.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
-		double scaleValue = matrixSumSquaredElementsVisitor.end();
-
-		scaleValue /= numRows;
-		scaleValue = Math.sqrt(scaleValue);
-
-		mA.setSubMatrix(mA.scalarMultiply(1./scaleValue).getData(), 0, 0);
+		// this is the old version of the calculation of the std; I suppose it is wrong 
+		// because we want to have the std = 1 over each coordinate not over the whole matrix!
+//		MatrixSumElementsVisitor matrixSumSquaredElementsVisitor = new CustomVisitorsFunctions().new MatrixSumElementsVisitor(1);
+//		matrixSumSquaredElementsVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+//		mA.walkInOptimizedOrder(matrixSumSquaredElementsVisitor);
+//		double scaleValue = matrixSumSquaredElementsVisitor.end();
+//		scaleValue /= numRows;
+//		scaleValue = Math.sqrt(scaleValue);
+//		mA.setSubMatrix(mA.scalarMultiply(1./scaleValue).getData(), 0, 0);
+		
+		// this seems to be the correct version
+		for (int d = 0; d < numColumns; ++d)
+			sumOverColumns[d] = 0;
+		ColumnSquareSumVisitor columnSquareSumVisitor = new CustomVisitorsFunctions().new ColumnSquareSumVisitor(sumOverColumns);
+		columnSquareSumVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+		mA.walkInOptimizedOrder(columnSquareSumVisitor);
+		columnSquareSumVisitor.end();
+		
+		for(int d = 0; d < numColumns; ++d)
+			sumOverColumns[d] = Math.sqrt(sumOverColumns[d]/numRows);
+		
+		ColumnDivideVisitor columnMultiplyVisitor = new CustomVisitorsFunctions().new ColumnDivideVisitor(sumOverColumns);
+		columnMultiplyVisitor.start(numRows, numColumns, 0, numRows - 1, 0, numColumns - 1);
+		mA.walkInOptimizedOrder(columnMultiplyVisitor);
+		columnMultiplyVisitor.end();
+		
+		return mA;
 	}
 
 	// FIXED
@@ -132,7 +124,7 @@ public class ApacheCPD {
 	 * @param mA - data points
 	 * @param mB - GMM centroids
 	 * */
-	protected static double getSigma2(RealMatrix mA, RealMatrix mB){
+	public static double getSigma2(RealMatrix mA, RealMatrix mB){
 		int M = mB.getRowDimension();
 		int N = mA.getRowDimension();
 
@@ -244,7 +236,7 @@ public class ApacheCPD {
 		return error; 
 	}
 
-	// FIXED
+	// FIXED // FIXME: Seems to be useless
 	/**
 	 * use this method if you want to read data X, Y from file 
 	 * */
@@ -557,6 +549,7 @@ public class ApacheCPD {
 		// TODO: you have to scale this data otherwise
 		// you won't see the convergence process
 		// new ApacheCPD().testNonRigid();
+		new ApacheCPDTests().testNonRigid();
 	}
 }
 
