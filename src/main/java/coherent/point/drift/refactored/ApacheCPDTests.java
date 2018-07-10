@@ -5,11 +5,11 @@ import org.apache.commons.math3.linear.RealMatrix;
 public class ApacheCPDTests {
 	
 	// non rigid test with for coherent point drift
-	public void testNonRigid(){
+	public static void testNonRigid(){
 		double w = 0.1; 
 		double beta = 2;
 		double lambda = 3;
-		int maxIteration = 30;
+		int maxIteration = 10;
 
 		// read data first
 		String path = "./src/main/resources/";
@@ -19,42 +19,46 @@ public class ApacheCPDTests {
 		RealMatrix mX = IOUtils.readPositionsFromCSV(from, '\t');
 		RealMatrix mY = IOUtils.readPositionsFromCSV(to, '\t');
 		
-		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runNonRigidRegistration(mX, mY);
+		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runNonRigidRegistration();
 	}
 	
 	// affine test with for coherent point drift
-	public void testAffine(){
+	public static void testAffine(){
 		double w = 0.1;
 		double beta = 2;
 		double lambda = 3;
-		int maxIteration = 30;
+		int maxIteration = 10;
 		
 		// read data first
 		String path = "./src/main/resources/";
-		String from = path + "fishy-fish-x.csv";
-		String to = path + "fishy-fish-y.csv";
+		String from = path + "x.csv";
+		String to = path + "y.csv";
 		
-		RealMatrix mX = IOUtils.readPositionsFromCSV(from, '\t');
-		RealMatrix mY = IOUtils.readPositionsFromCSV(to, '\t');
+		RealMatrix mX = IOUtils.readPositionsFromCSV(from, ',');
+		RealMatrix mY = IOUtils.readPositionsFromCSV(to, ',');
 		
-		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runAffineRegistration(mX, mY);
+		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runAffineRegistration();
 	}
 	
-// rigis test with for coherent point drift
-	public void testRigid(){
+// rigid test with for coherent point drift
+	public static void testRigid(){
 		double w = 0.1;
 		double beta = 2;
 		double lambda = 3;
-		int maxIteration = 30;
+		int maxIteration = 10;
 		
 		// read data first
 		String path = "./src/main/resources/";
-		String from = path + "fishy-fish-rigid-x.csv";
-		String to = path + "fishy-fish-rigid-y.csv";
+		String from = path + "x.csv";
+		String to = path + "y.csv";
 		
-		RealMatrix mX = IOUtils.readPositionsFromCSV(from, '\t');
-		RealMatrix mY = IOUtils.readPositionsFromCSV(to, '\t');
+		RealMatrix mX = IOUtils.readPositionsFromCSV(from, ',');
+		RealMatrix mY = IOUtils.readPositionsFromCSV(to, ',');
 		
-		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runRigidRegistration(mX, mY);
+		new ApacheCPD(mX, mY, w, beta, lambda, maxIteration).runRigidRegistration();
+	}
+	
+	public static void main(String[] args) {
+		testNonRigid();
 	}
 }
