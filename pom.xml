@@ -12,7 +12,7 @@
 	<name>Software for segmentation and analysis of smFISH worm images</name>
 
 	<dependencies>
-		<dependency>
+<!-- 		<dependency>
 			<groupId>com.opencsv</groupId>
 			<artifactId>opencsv</artifactId>
 			<version>3.7</version>
@@ -21,7 +21,7 @@
 			<groupId>org.la4j</groupId>
 			<artifactId>la4j</artifactId>
 			<version>0.6.0</version>
-		</dependency>
+		</dependency> -->
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2</artifactId>
@@ -45,7 +45,6 @@
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-algorithm</artifactId>
-			<version>0.5.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>sc.fiji</groupId>
@@ -75,7 +74,6 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>SPIM_Registration</artifactId>
-			<version>5.0.5-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
@@ -84,7 +82,7 @@
 		<dependency>
 			<groupId>sc.fiji</groupId>
 			<artifactId>RadialSymmetryLocalization</artifactId>
-			<version>0.0.2-SNAPSHOT</version>
+			<version>1.1.2-SNAPSHOT</version>
 		</dependency>
 
 		<!-- Test dependencies -->
@@ -105,38 +103,8 @@
 		<repository>
 			<id>imagej.public</id>
 			<url>http://maven.imagej.net/content/groups/public</url>
+			
 		</repository>
 	</repositories>
-
-	<build>
-		<plugins>
-	      <plugin>
-			  <groupId>org.apache.maven.plugins</groupId>
-			  <artifactId>maven-assembly-plugin</artifactId>
-			  <configuration>
-			    <archive>
-			      <manifest>
-			        <mainClass>klim.deconvolution.ClusterRun</mainClass>
-			      </manifest>
-			    </archive>
-			  </configuration>
-			</plugin>	
-		    <plugin>
-		        <artifactId>maven-compiler-plugin</artifactId>
-		        <configuration>
-		            <source>1.8</source>
-		            <target>1.8</target>
-		        </configuration>
-		    </plugin>
-		    <plugin>
-		        <groupId>org.apache.maven.plugins</groupId>
-		        <artifactId>maven-ejb-plugin</artifactId>
-		        <configuration>
-		            <ejbVersion>3.0</ejbVersion>
-		        </configuration>
-		    </plugin>	    
-		</plugins>
-	</build>
-
 	<packaging>ejb</packaging>
 </project>

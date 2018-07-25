@@ -6,7 +6,7 @@ import org.apache.commons.math3.linear.RealMatrix;
 import org.junit.Before;
 import org.junit.Test;
 
-import coherent.point.drift.ApacheCPD;
+import deprecated.coherent.point.drift.ApacheCPD;
 
 public class CPDTest {
 

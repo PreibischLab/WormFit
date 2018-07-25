@@ -22,7 +22,7 @@ import util.ImgLib2Util;
  */
 public class Thresholding
 {
-	public static < T extends Comparable< T > > void threshold( final RandomAccessibleInterval< T > in, final RandomAccessibleInterval< BitType > out, final T threshold )
+	public static < T extends Comparable< T > > void threshold( final RandomAccessibleInterval< T > in, final RandomAccessibleInterval< BitType > out, final T threshold)
 	{
 		final Cursor< T > cIn = Views.iterable( in ).localizingCursor();
 		final RandomAccess< BitType > rOut = out.randomAccess();
