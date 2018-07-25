@@ -3,6 +3,7 @@ package deconvolution;
 import ij.ImagePlus;
 import ij.ImageStack;
 import klim.deconvolution.DeconvolutionTest;
+import klim.deconvolution.Utils;
 
 import java.util.Date;
 
@@ -35,7 +36,7 @@ public class DeconvolveTest
 		double ratio = totalEnergy/currentEnergy;
 
 		// number of deconvolve iterations
-		for ( int i = 0; i < 200; ++ i )
+		for ( int i = 0; i <= 500; ++ i )
 		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
@@ -75,13 +76,13 @@ public class DeconvolveTest
 		// impStack.show();
 		// impStack.setRoi(15,39,615,274);
 		
-		System.out.println("image before: " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+		System.out.println("image before: " + Utils.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		currentEnergy = AdjustInput.sumImage(d.getPsi())/(double)d.getPsi().getNumPixels();
 		ratio = totalEnergy/currentEnergy;
 		
 		// adjust the Image intensities so that they sum up to 1
 		AdjustInput.adjustImage(d.getPsi(), ratio);
-		System.out.println("image after : " + DeconvolutionTest.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
+		System.out.println("image after : " + Utils.sumIntensitiesInDouble(ImgLib1.wrapArrayFloatToImgLib2(d.getPsi()))/(double)d.getPsi().getNumPixels());
 		
 		ImageJFunctions.show( d.getPsi() );
 	}

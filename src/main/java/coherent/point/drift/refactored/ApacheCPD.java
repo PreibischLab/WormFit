@@ -84,7 +84,7 @@ public class ApacheCPD {
 	
 	public static int runNonRigidRegistration(RealMatrix mX, RealMatrix mY, RealMatrix mW, RealMatrix mG, RealMatrix mP, RealMatrix mT, double w, double beta, double lambda, int maxIteration){
 		// this params should never be changed after reading the files or creating the matrices
-		final int numDimensions = mX.getColumnDimension(); ; // dimensionality of the point set
+		final int numDimensions = mX.getColumnDimension(); // dimensionality of the point set
 		final int numSpotsSample = mX.getRowDimension(); // # of points in the first point set
 		final int numSpotsLineage = mY.getRowDimension(); // # of points in the second point set
 
@@ -106,8 +106,7 @@ public class ApacheCPD {
 
 		// TODO: add error estimator here 
 		while (iter++ < maxIteration && sigma2 > 1e-10){
-			Utils.printLog(iter, sigma2, Math.abs((error - errorOld)/error));
-
+			// Utils.printLog(iter, sigma2, Math.abs((error - errorOld)/error));
 			errorOld = error;
 			error = calculatePnonRigid(mX, mY, mP, mW, mG, w, sigma2);
 			error += lambda/2*(mW.transpose().multiply(mG).multiply(mW)).getTrace();

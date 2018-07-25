@@ -412,7 +412,7 @@ public class MedianFilter
 //			}
 			long inT  = System.nanoTime();
 			//final RandomAccessible< T > infSrc, final Interval srcInterval, final RandomAccessibleInterval< T > dst, final int[] kernelDim);
-			//medianFilter(img, dst, new FinalInterval(min, max));
+			// medianFilter(img, dst, new FinalInterval(min, max));
 			medianFilter(img, dst, new int[]{jj, jj, jj});
 			System.out.println("kernel = " + jj + "x" + jj + " : "+ TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - inT)/1000.0);
 			ImageJFunctions.show(dst);

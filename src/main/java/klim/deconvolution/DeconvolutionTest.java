@@ -221,13 +221,13 @@ public class DeconvolutionTest {
 
 	public static void mainDeconvolution() {
 
-		String pathMac = "/Users/kkolyva/Desktop/latest_desktop/27_09_16_psf_results/";
+		String pathMac = "/Users/kkolyva/Desktop/2018-06-11-10-09-02-test-mser/";
 		String pathUbuntu = "/home/milkyklim/Desktop/";
 
-		String path = pathUbuntu;
+		String path = pathMac;
 
-		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "worm-piece.tif"));
-		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "PSF-done-100.tif"));
+		Img<FloatType> img = ImgLib2Util.openAs32Bit(new File(path + "C3-SEA-12_59.tif"));
+		Img<FloatType> psf = ImgLib2Util.openAs32Bit(new File(path + "psf.tif"));
 
 		Run.runDeconvolution(img, psf);
 	}
@@ -379,7 +379,7 @@ public class DeconvolutionTest {
 		// checked image beforehand
 		// TODO: either pass these values or set them here 
 		params.setSigmaDog(4);
-		params.setThresholdDoG(0.003f); 
+		params.setThresholdDog(0.003f); 
 		params.setSupportRadius(2);
 		params.setMaxError(3);
 		params.setInlierRatio(0.9f);
@@ -488,12 +488,12 @@ public class DeconvolutionTest {
 		// testNormalization();
 		// test3D();
 		// runTestTotalIntensity();
-		// mainDeconvolution();
+		mainDeconvolution();
 		// runExtractGeneratedBeads();
 
 
-		Run.runExtractBeads();
-		//Run.runRSExtractBeads();
+		// Run.runExtractBeads();
+		// Run.runRSExtractBeads();
 
 		// runGaussianFitting();
 		// mainDeconvolutionSliced();
