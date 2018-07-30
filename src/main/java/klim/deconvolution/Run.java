@@ -141,7 +141,7 @@ public class Run {
 
 		// checked image beforehand (used interactive radial symmetry here)
 		params.setSigmaDog(4);
-		params.setThresholdDoG(0.003f);  // (3.5f); 
+		params.setThresholdDog(0.003f);  // (3.5f); 
 		params.setSupportRadius(2);
 		params.setMaxError(3);
 		params.setInlierRatio(0.9f);

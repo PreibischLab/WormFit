@@ -39,6 +39,7 @@ public class DeconvolveTest
 		// number of deconvolve iterations
 		int maxIter = 500;
 		for ( int i = 0; i < maxIter; ++ i )
+		{
 			System.out.println( new Date( System.currentTimeMillis() ) + " " +  i );
 			d.runIteration();
 

@@ -438,7 +438,7 @@ public class DeconvolutionTest {
 		
 		int numDimensions = img.numDimensions();
 		
-		final GUIParams params = new GUIParams();
+		//final GUIParams params = new GUIParams();
 		params.setDefaultValues(); 
 
 		// checked image beforehand
@@ -454,7 +454,7 @@ public class DeconvolutionTest {
 		double [] calibration = HelperFunctions.initCalibration(imp, numDimensions); // new double[]{1, 1, 1};
 
 		RadialSymmetryParameters rsm = new RadialSymmetryParameters(params, calibration);
-		RadialSymmetry rs = new RadialSymmetry(rsm, img);
+		RadialSymmetry rs = new RadialSymmetry( img, rsm );
 				
 		double [] realMin = new double[numDimensions];
 		double [] realMax = new double[numDimensions];
@@ -558,13 +558,10 @@ public class DeconvolutionTest {
 		// runExtractGeneratedBeads();
 
 
-<<<<<<< HEAD
 		//Run.runExtractBeads();
 		Run.runRSExtractBeads();
-=======
 		// Run.runExtractBeads();
 		// Run.runRSExtractBeads();
->>>>>>> 4b3a1f7eebaf5dba49bb7485eb5905397d3e222f
 
 		// runGaussianFitting();
 		// mainDeconvolutionSliced();
